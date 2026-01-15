@@ -215,24 +215,7 @@ export default function HomePage() {
         })}
       </div>
 
-      {/* 🔻 FOOTER */}
-      <footer
-        style={{
-          marginTop: 60,
-          paddingTop: 24,
-          borderTop: "1px solid #e5e7eb",
-          display: "flex",
-          gap: 16,
-          flexWrap: "wrap",
-          fontSize: 14,
-          color: "#666",
-        }}
-      >
-        <span>© {new Date().getFullYear()} Deklata</span>
-        <Link href="/how-it-works">How It Works</Link>
-        <Link href="/terms">Terms of Use</Link>
-        <Link href="/guidelines">Community Guidelines</Link>
-      </footer>
+      
     </main>
   );
 }
