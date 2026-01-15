@@ -107,7 +107,7 @@ export default function RegisterPage() {
           />
 
           <input
-            placeholder="WhatsApp number"
+            placeholder="Phone number"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             required
