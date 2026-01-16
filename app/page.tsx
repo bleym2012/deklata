@@ -17,56 +17,77 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadHomeData();
+    let cancelled = false;
+
+    async function loadHomeDataSafe() {
+      try {
+        setLoading(true);
+
+        /* 1️⃣ LOAD ITEMS FIRST (NO AUTH BLOCKING) */
+        const { data: itemsData, error } = await supabase
+          .from("items")
+          .select("*")
+          .eq("status", "available")
+          .order("created_at", { ascending: false });
+
+        if (!cancelled) {
+          setItems(itemsData || []);
+          setFilteredItems(itemsData || []);
+          setLoading(false); // 👈 STOP LOADING IMMEDIATELY
+        }
+
+        if (error) {
+          console.error(error);
+        }
+
+        /* 2️⃣ NON-BLOCKING USER ENHANCEMENT */
+        supabase.auth.getUser().then(({ data }) => {
+          if (!data.user || cancelled) return;
+
+          setUserId(data.user.id);
+
+          supabase
+            .from("requests")
+            .select("item_id")
+            .eq("requester_id", data.user.id)
+            .in("status", ["pending", "approved"])
+            .then(({ data: requests }) => {
+              if (!cancelled && requests) {
+                setRequestedItemIds(
+                  new Set(requests.map((r) => r.item_id))
+                );
+              }
+            });
+        });
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadHomeDataSafe();
+
+    /* 🛑 SAFETY TIMEOUT (NEVER HANGS) */
+    const timeout = setTimeout(() => {
+      if (!cancelled) setLoading(false);
+    }, 5000);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
   }, []);
 
   useEffect(() => {
-    applyFilters();
-  }, [search, category, items]);
-
-  async function loadHomeData() {
-    setLoading(true);
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (user) {
-      setUserId(user.id);
-
-      const { data: requests } = await supabase
-        .from("requests")
-        .select("item_id")
-        .eq("requester_id", user.id)
-        .in("status", ["pending", "approved"]);
-
-      setRequestedItemIds(new Set(requests?.map((r) => r.item_id)));
-    }
-
-    const { data, error } = await supabase
-      .from("items")
-      .select("*")
-      .eq("status", "available")
-      .order("created_at", { ascending: false });
-
-    if (!error) {
-      setItems(data || []);
-      setFilteredItems(data || []);
-    }
-
-    setLoading(false);
-  }
-
-  function applyFilters() {
     let result = [...items];
 
     if (category !== "all") {
-       const normalizedCategory =
-    category.toLowerCase()
+      const normalizedCategory = category.toLowerCase();
       result = result.filter(
-        (item) => 
-          item.category && 
-          item.category.toLowerCase() === normalizedCategory);
+        (item) =>
+          item.category &&
+          item.category.toLowerCase() === normalizedCategory
+      );
     }
 
     if (search.trim()) {
@@ -79,7 +100,7 @@ export default function HomePage() {
     }
 
     setFilteredItems(result);
-  }
+  }, [search, category, items]);
 
   if (loading) {
     return (
@@ -98,8 +119,6 @@ export default function HomePage() {
         fontFamily: "system-ui, -apple-system, BlinkMacSystemFont",
       }}
     >
-      {/* 🔷 HEADER */}
-
       {/* 🔍 SEARCH */}
       <input
         type="text"
@@ -140,7 +159,6 @@ export default function HomePage() {
               cursor: "pointer",
               fontSize: 14,
               fontWeight: 500,
-              transition: "all 0.2s",
             }}
           >
             {cat.charAt(0).toUpperCase() + cat.slice(1)}
@@ -171,7 +189,6 @@ export default function HomePage() {
                 opacity: !isOwner && isRequested ? 0.5 : 1,
                 pointerEvents: !isOwner && isRequested ? "none" : "auto",
                 position: "relative",
-                transition: "transform 0.15s ease",
               }}
             >
               {!isOwner && isRequested && (
@@ -214,8 +231,6 @@ export default function HomePage() {
           );
         })}
       </div>
-
-      
     </main>
   );
 }
