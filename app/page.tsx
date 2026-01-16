@@ -37,6 +37,18 @@ export default function HomePage() {
     router.replace(`/?${params.toString()}`, { scroll: false });
   }, [page, category, search, router]);
 
+  /* ✅ SAVE RESULTS STATE FOR BACK NAVIGATION (PRODUCTION SAFE) */
+  useEffect(() => {
+    sessionStorage.setItem(
+      "deklata:lastResults",
+      JSON.stringify({
+        page,
+        category,
+        q: search,
+      })
+    );
+  }, [page, category, search]);
+
   useEffect(() => {
     let cancelled = false;
 

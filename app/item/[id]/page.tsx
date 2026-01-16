@@ -27,13 +27,15 @@ export default function ItemDetailsPage() {
 
   useEffect(() => {
     loadItem();
-    // eslint-disable-next-line
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function loadItem() {
     setLoading(true);
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (user) setUserId(user.id);
 
     const { data: itemData } = await supabase
