@@ -23,26 +23,25 @@ export default function HomePage() {
       try {
         setLoading(true);
 
-        /* 1️⃣ LOAD ITEMS FIRST (NO AUTH BLOCKING) */
+        /* 1️⃣ LOAD ITEMS FIRST (FAST, NON-BLOCKING) */
         const { data: itemsData, error } = await supabase
           .from("items")
-          .select("*")
+          .select("id, name, description, category, pickup_location, owner_id")
           .eq("status", "available")
-          .order("created_at", { ascending: false });
+          .order("created_at", { ascending: false })
+          .limit(20);
 
         if (!cancelled) {
           setItems(itemsData || []);
           setFilteredItems(itemsData || []);
-          setLoading(false); // 👈 STOP LOADING IMMEDIATELY
+          setLoading(false); // stop loading immediately
         }
 
-        if (error) {
-          console.error(error);
-        }
+        if (error) console.error(error);
 
         /* 2️⃣ NON-BLOCKING USER ENHANCEMENT */
         supabase.auth.getUser().then(({ data }) => {
-          if (!data.user || cancelled) return;
+          if (!data?.user || cancelled) return;
 
           setUserId(data.user.id);
 
@@ -67,7 +66,7 @@ export default function HomePage() {
 
     loadHomeDataSafe();
 
-    /* 🛑 SAFETY TIMEOUT (NEVER HANGS) */
+    /* 🛑 SAFETY TIMEOUT — NEVER HANGS */
     const timeout = setTimeout(() => {
       if (!cancelled) setLoading(false);
     }, 5000);
@@ -78,15 +77,15 @@ export default function HomePage() {
     };
   }, []);
 
+  /* 🔍 FILTERING */
   useEffect(() => {
     let result = [...items];
 
     if (category !== "all") {
-      const normalizedCategory = category.toLowerCase();
       result = result.filter(
         (item) =>
           item.category &&
-          item.category.toLowerCase() === normalizedCategory
+          item.category.toLowerCase() === category.toLowerCase()
       );
     }
 
@@ -102,11 +101,64 @@ export default function HomePage() {
     setFilteredItems(result);
   }, [search, category, items]);
 
+  /* 🦴 SKELETON LOADER */
   if (loading) {
     return (
-      <div style={{ padding: 40, textAlign: "center", color: "#666" }}>
-        Loading items…
-      </div>
+      <main
+        style={{
+          maxWidth: 1200,
+          margin: "0 auto",
+          padding: "32px 20px",
+        }}
+      >
+        {/* Skeleton search bar */}
+        <div
+          style={{
+            height: 48,
+            borderRadius: 10,
+            background: "#f3f4f6",
+            marginBottom: 18,
+            animation: "pulse 1.5s infinite",
+          }}
+        />
+
+        {/* Skeleton category pills */}
+        <div style={{ display: "flex", gap: 10, marginBottom: 30 }}>
+          {[...Array(4)].map((_, i) => (
+            <div
+              key={i}
+              style={{
+                height: 32,
+                width: 80,
+                borderRadius: 999,
+                background: "#f3f4f6",
+                animation: "pulse 1.5s infinite",
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Skeleton cards */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+            gap: 20,
+          }}
+        >
+          {[...Array(6)].map((_, i) => (
+            <div
+              key={i}
+              style={{
+                height: 160,
+                borderRadius: 14,
+                background: "#f3f4f6",
+                animation: "pulse 1.5s infinite",
+              }}
+            />
+          ))}
+        </div>
+      </main>
     );
   }
 
@@ -133,19 +185,11 @@ export default function HomePage() {
           border: "1px solid #e5e7eb",
           fontSize: 15,
           outline: "none",
-          boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
         }}
       />
 
       {/* 🏷 CATEGORIES */}
-      <div
-        style={{
-          display: "flex",
-          gap: 10,
-          flexWrap: "wrap",
-          marginBottom: 30,
-        }}
-      >
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 30 }}>
         {CATEGORIES.map((cat) => (
           <button
             key={cat}
