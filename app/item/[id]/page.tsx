@@ -1,12 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
 
 export default function ItemDetailsPage() {
   const { id } = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // 🔁 Restore homepage state
+  const page = searchParams.get("page") || "1";
+  const category = searchParams.get("category") || "all";
+  const q = searchParams.get("q") || "";
+
+  const backUrl = `/?page=${page}&category=${category}&q=${q}`;
 
   const [item, setItem] = useState<any>(null);
   const [images, setImages] = useState<any[]>([]);
@@ -23,9 +31,7 @@ export default function ItemDetailsPage() {
   async function loadItem() {
     setLoading(true);
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
     if (user) setUserId(user.id);
 
     const { data: itemData } = await supabase
@@ -83,7 +89,7 @@ export default function ItemDetailsPage() {
     await supabase.from("item_images").delete().eq("item_id", id);
     await supabase.from("items").delete().eq("id", id);
 
-    router.push("/");
+    router.push(backUrl);
   }
 
   if (loading) {
@@ -105,9 +111,9 @@ export default function ItemDetailsPage() {
         fontFamily: "system-ui, -apple-system, BlinkMacSystemFont",
       }}
     >
-      {/* 🔙 BACK */}
+      {/* 🔙 BACK TO RESULTS */}
       <button
-        onClick={() => router.push("/")}
+        onClick={() => router.push(backUrl)}
         style={{
           background: "none",
           border: "none",
@@ -117,7 +123,7 @@ export default function ItemDetailsPage() {
           fontSize: 14,
         }}
       >
-        ← Back to Home
+        ← Back to results
       </button>
 
       {/* TWO COLUMN LAYOUT */}
@@ -158,13 +164,7 @@ export default function ItemDetailsPage() {
 
         {/* 📄 DETAILS */}
         <div>
-          <h1
-            style={{
-              fontSize: 30,
-              fontWeight: 700,
-              marginBottom: 10,
-            }}
-          >
+          <h1 style={{ fontSize: 30, fontWeight: 700, marginBottom: 10 }}>
             {item.name}
           </h1>
 

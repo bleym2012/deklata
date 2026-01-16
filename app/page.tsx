@@ -2,23 +2,38 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "./lib/supabaseClient";
 
 const CATEGORIES = ["all", "books", "electronics", "furniture", "others"];
 const PAGE_SIZE = 20;
 
 export default function HomePage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [items, setItems] = useState<any[]>([]);
   const [filteredItems, setFilteredItems] = useState<any[]>([]);
   const [requestedItemIds, setRequestedItemIds] = useState<Set<string>>(new Set());
   const [userId, setUserId] = useState<string | null>(null);
 
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("all");
-  const [loading, setLoading] = useState(true);
+  /* 🔁 RESTORE STATE FROM URL */
+  const [search, setSearch] = useState(searchParams.get("q") || "");
+  const [category, setCategory] = useState(searchParams.get("category") || "all");
+  const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
 
-  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
+
+  /* 🔁 SYNC STATE → URL */
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (page > 1) params.set("page", String(page));
+    if (category !== "all") params.set("category", category);
+    if (search.trim()) params.set("q", search);
+
+    router.replace(`/?${params.toString()}`, { scroll: false });
+  }, [page, category, search, router]);
 
   useEffect(() => {
     let cancelled = false;
@@ -27,7 +42,6 @@ export default function HomePage() {
       try {
         setLoading(true);
 
-        /* 1️⃣ LOAD ITEMS (FAST) */
         const from = (page - 1) * PAGE_SIZE;
         const to = from + PAGE_SIZE - 1;
 
@@ -50,7 +64,6 @@ export default function HomePage() {
 
         if (error) console.error(error);
 
-        /* 2️⃣ NON-BLOCKING USER ENHANCEMENT */
         supabase.auth.getUser().then(({ data }) => {
           if (!data?.user || cancelled) return;
 
@@ -63,9 +76,7 @@ export default function HomePage() {
             .in("status", ["pending", "approved"])
             .then(({ data: requests }) => {
               if (!cancelled && requests) {
-                setRequestedItemIds(
-                  new Set(requests.map((r) => r.item_id))
-                );
+                setRequestedItemIds(new Set(requests.map((r) => r.item_id)));
               }
             });
         });
@@ -87,7 +98,7 @@ export default function HomePage() {
     };
   }, [page]);
 
-  /* 🔍 FILTERING (CLIENT-SIDE) */
+  /* 🔍 FILTERING */
   useEffect(() => {
     let result = [...items];
 
@@ -111,7 +122,7 @@ export default function HomePage() {
     setFilteredItems(result);
   }, [search, category, items]);
 
-  /* 🦴 SKELETON LOADER */
+  /* 🦴 SKELETON */
   if (loading) {
     return (
       <main style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 20px" }}>
@@ -149,7 +160,10 @@ export default function HomePage() {
         type="text"
         placeholder="Search items..."
         value={search}
-        onChange={(e) => setSearch(e.target.value)}
+        onChange={(e) => {
+          setSearch(e.target.value);
+          setPage(1);
+        }}
         style={{
           width: "100%",
           padding: "14px 16px",
@@ -190,7 +204,7 @@ export default function HomePage() {
         <strong>{totalCount}</strong> items
       </p>
 
-      {/* 🧱 ITEMS GRID */}
+      {/* 🧱 GRID */}
       <div
         style={{
           display: "grid",
@@ -233,9 +247,7 @@ export default function HomePage() {
               )}
 
               <Link href={`/item/${item.id}`} style={{ color: "inherit" }}>
-                <h3 style={{ fontSize: 18, fontWeight: 600 }}>
-                  {item.name}
-                </h3>
+                <h3 style={{ fontSize: 18, fontWeight: 600 }}>{item.name}</h3>
                 <p style={{ fontSize: 14, color: "#555", margin: "8px 0" }}>
                   {item.description}
                 </p>
