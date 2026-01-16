@@ -5,6 +5,7 @@ import Link from "next/link";
 import { supabase } from "./lib/supabaseClient";
 
 const CATEGORIES = ["all", "books", "electronics", "furniture", "others"];
+const PAGE_SIZE = 20;
 
 export default function HomePage() {
   const [items, setItems] = useState<any[]>([]);
@@ -16,6 +17,9 @@ export default function HomePage() {
   const [category, setCategory] = useState("all");
   const [loading, setLoading] = useState(true);
 
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -23,18 +27,25 @@ export default function HomePage() {
       try {
         setLoading(true);
 
-        /* 1️⃣ LOAD ITEMS FIRST (FAST, NON-BLOCKING) */
-        const { data: itemsData, error } = await supabase
+        /* 1️⃣ LOAD ITEMS (FAST) */
+        const from = (page - 1) * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+
+        const { data: itemsData, count, error } = await supabase
           .from("items")
-          .select("id, name, description, category, pickup_location, owner_id")
+          .select(
+            "id, name, description, category, pickup_location, owner_id",
+            { count: "exact" }
+          )
           .eq("status", "available")
           .order("created_at", { ascending: false })
-          .limit(20);
+          .range(from, to);
 
         if (!cancelled) {
           setItems(itemsData || []);
           setFilteredItems(itemsData || []);
-          setLoading(false); // stop loading immediately
+          setTotalCount(count || 0);
+          setLoading(false);
         }
 
         if (error) console.error(error);
@@ -66,7 +77,6 @@ export default function HomePage() {
 
     loadHomeDataSafe();
 
-    /* 🛑 SAFETY TIMEOUT — NEVER HANGS */
     const timeout = setTimeout(() => {
       if (!cancelled) setLoading(false);
     }, 5000);
@@ -75,9 +85,9 @@ export default function HomePage() {
       cancelled = true;
       clearTimeout(timeout);
     };
-  }, []);
+  }, [page]);
 
-  /* 🔍 FILTERING */
+  /* 🔍 FILTERING (CLIENT-SIDE) */
   useEffect(() => {
     let result = [...items];
 
@@ -104,63 +114,26 @@ export default function HomePage() {
   /* 🦴 SKELETON LOADER */
   if (loading) {
     return (
-      <main
-        style={{
-          maxWidth: 1200,
-          margin: "0 auto",
-          padding: "32px 20px",
-        }}
-      >
-        {/* Skeleton search bar */}
-        <div
-          style={{
-            height: 48,
-            borderRadius: 10,
-            background: "#f3f4f6",
-            marginBottom: 18,
-            animation: "pulse 1.5s infinite",
-          }}
-        />
-
-        {/* Skeleton category pills */}
-        <div style={{ display: "flex", gap: 10, marginBottom: 30 }}>
-          {[...Array(4)].map((_, i) => (
-            <div
-              key={i}
-              style={{
-                height: 32,
-                width: 80,
-                borderRadius: 999,
-                background: "#f3f4f6",
-                animation: "pulse 1.5s infinite",
-              }}
-            />
-          ))}
-        </div>
-
-        {/* Skeleton cards */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-            gap: 20,
-          }}
-        >
-          {[...Array(6)].map((_, i) => (
-            <div
-              key={i}
-              style={{
-                height: 160,
-                borderRadius: 14,
-                background: "#f3f4f6",
-                animation: "pulse 1.5s infinite",
-              }}
-            />
-          ))}
-        </div>
+      <main style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 20px" }}>
+        {[...Array(6)].map((_, i) => (
+          <div
+            key={i}
+            style={{
+              height: 160,
+              borderRadius: 14,
+              background: "#f3f4f6",
+              marginBottom: 16,
+              animation: "pulse 1.5s infinite",
+            }}
+          />
+        ))}
       </main>
     );
   }
+
+  const startItem = (page - 1) * PAGE_SIZE + 1;
+  const endItem = Math.min(page * PAGE_SIZE, totalCount);
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   return (
     <main
@@ -184,31 +157,38 @@ export default function HomePage() {
           borderRadius: 10,
           border: "1px solid #e5e7eb",
           fontSize: 15,
-          outline: "none",
         }}
       />
 
       {/* 🏷 CATEGORIES */}
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 30 }}>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 24 }}>
         {CATEGORIES.map((cat) => (
           <button
             key={cat}
-            onClick={() => setCategory(cat)}
+            onClick={() => {
+              setCategory(cat);
+              setPage(1);
+            }}
             style={{
               padding: "8px 16px",
               borderRadius: 999,
               border: "1px solid #e5e7eb",
               background: category === cat ? "#111" : "#fff",
               color: category === cat ? "#fff" : "#111",
-              cursor: "pointer",
               fontSize: 14,
-              fontWeight: 500,
+              cursor: "pointer",
             }}
           >
             {cat.charAt(0).toUpperCase() + cat.slice(1)}
           </button>
         ))}
       </div>
+
+      {/* 📊 RESULT COUNT */}
+      <p style={{ marginBottom: 16, fontSize: 14, color: "#555" }}>
+        Showing <strong>{startItem}–{endItem}</strong> of{" "}
+        <strong>{totalCount}</strong> items
+      </p>
 
       {/* 🧱 ITEMS GRID */}
       <div
@@ -252,18 +232,13 @@ export default function HomePage() {
                 </span>
               )}
 
-              <Link
-                href={`/item/${item.id}`}
-                style={{ textDecoration: "none", color: "inherit" }}
-              >
-                <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 6 }}>
+              <Link href={`/item/${item.id}`} style={{ color: "inherit" }}>
+                <h3 style={{ fontSize: 18, fontWeight: 600 }}>
                   {item.name}
                 </h3>
-
-                <p style={{ fontSize: 14, color: "#555", marginBottom: 10 }}>
+                <p style={{ fontSize: 14, color: "#555", margin: "8px 0" }}>
                   {item.description}
                 </p>
-
                 <p style={{ fontSize: 13, color: "#666" }}>
                   <strong>Category:</strong> {item.category}
                 </p>
@@ -274,6 +249,34 @@ export default function HomePage() {
             </div>
           );
         })}
+      </div>
+
+      {/* 🔢 PAGINATION */}
+      <div
+        style={{
+          marginTop: 32,
+          display: "flex",
+          justifyContent: "center",
+          gap: 8,
+          flexWrap: "wrap",
+        }}
+      >
+        {Array.from({ length: totalPages }).map((_, i) => (
+          <button
+            key={i}
+            onClick={() => setPage(i + 1)}
+            style={{
+              padding: "8px 14px",
+              borderRadius: 8,
+              border: "1px solid #e5e7eb",
+              background: page === i + 1 ? "#111" : "#fff",
+              color: page === i + 1 ? "#fff" : "#111",
+              cursor: "pointer",
+            }}
+          >
+            {i + 1}
+          </button>
+        ))}
       </div>
     </main>
   );
