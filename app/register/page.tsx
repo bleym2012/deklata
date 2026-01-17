@@ -122,6 +122,7 @@ export default function RegisterPage() {
           >
             <option value="">Select campus</option>
             <option value="UDS-Tamale">UDS-Tamale</option>
+            <option value="UDS-Nyankpala">UDS-Nyankpala</option>
             <option value="Tamale Technical University">
               Tamale Technical University
             </option>

@@ -39,6 +39,18 @@ export default function Header() {
         How it works
       </Link>
 
+      <Link href="/contact" onClick={() => setMenuOpen(false)}>
+        Contact us
+      </Link>
+      
+
+
+
+
+
+
+
+
       {!user && (
         <>
           <Link href="/login" onClick={() => setMenuOpen(false)}>
