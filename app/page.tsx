@@ -1,19 +1,7 @@
 "use client";
 
-
-<div style={{ position: "fixed", bottom: 10, right: 10, fontSize: 12, color: "red" }}>
-  PROD-BUILD-TEST-123
-</div>
-
-
-
-
-
-
-
-
-
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -31,13 +19,20 @@ export default function HomePage() {
   const [filteredItems, setFilteredItems] = useState<any[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
 
-  /* 🔁 RESTORE STATE FROM URL */
-  const [search, setSearch] = useState(searchParams.get("q") || "");
-  const [category, setCategory] = useState(searchParams.get("category") || "all");
-  const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
+  /* 🔁 STATE (INITIALIZED SAFELY — NO BUILD ACCESS) */
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("all");
+  const [page, setPage] = useState(1);
 
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
+
+  /* 🔁 RESTORE STATE FROM URL (RUNTIME ONLY) */
+  useEffect(() => {
+    setSearch(searchParams.get("q") || "");
+    setCategory(searchParams.get("category") || "all");
+    setPage(Number(searchParams.get("page")) || 1);
+  }, [searchParams]);
 
   /* 🔁 SYNC STATE → URL */
   useEffect(() => {
@@ -49,14 +44,17 @@ export default function HomePage() {
     router.replace(`/?${params.toString()}`, { scroll: false });
   }, [page, category, search, router]);
 
-  /* ✅ SAVE RESULTS STATE */
+  /* ✅ SAVE RESULTS STATE (CLIENT ONLY) */
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     sessionStorage.setItem(
       "deklata:lastResults",
       JSON.stringify({ page, category, q: search })
     );
   }, [page, category, search]);
 
+  /* 🔄 LOAD ITEMS */
   useEffect(() => {
     let cancelled = false;
 
@@ -226,8 +224,7 @@ export default function HomePage() {
         {filteredItems.map((item) => {
           const isOwner = userId === item.owner_id;
           const isLoggedIn = !!userId;
-          const isRequested =isLoggedIn &&
-          item.is_locked === true;
+          const isRequested = isLoggedIn && item.is_locked === true;
 
           return (
             <div
