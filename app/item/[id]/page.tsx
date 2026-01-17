@@ -11,7 +11,7 @@ export default function ItemDetailsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // 🔁 Restore homepage state
+  /* 🔁 RESTORE HOMEPAGE STATE */
   const page = searchParams.get("page") || "1";
   const category = searchParams.get("category") || "all";
   const q = searchParams.get("q") || "";
@@ -21,7 +21,6 @@ export default function ItemDetailsPage() {
   const [item, setItem] = useState<any>(null);
   const [images, setImages] = useState<any[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
-  const [hasRequested, setHasRequested] = useState(false);
   const [loading, setLoading] = useState(true);
   const [requesting, setRequesting] = useState(false);
 
@@ -36,7 +35,9 @@ export default function ItemDetailsPage() {
     const {
       data: { user },
     } = await supabase.auth.getUser();
+
     if (user) setUserId(user.id);
+    else setUserId(null);
 
     const { data: itemData } = await supabase
       .from("items")
@@ -49,41 +50,32 @@ export default function ItemDetailsPage() {
       .select("*")
       .eq("item_id", id);
 
-    if (user) {
-      const { data: existingRequest } = await supabase
-        .from("requests")
-        .select("id")
-        .eq("item_id", id)
-        .eq("requester_id", user.id)
-        .in("status", ["pending", "approved"])
-        .maybeSingle();
-
-      if (existingRequest) setHasRequested(true);
-    }
-
     setItem(itemData);
     setImages(imageData || []);
     setLoading(false);
   }
 
   async function requestItem() {
-    if (!userId) return alert("Please log in");
+    // 🚨 NOT LOGGED IN → REDIRECT (NO ALERT)
+    if (!userId) {
+      router.push(`/login?redirect=/item/${id}`);
+      return;
+    }
+
+    if (item?.is_locked) return;
 
     setRequesting(true);
 
-    const { error } = await supabase.from("requests").insert({
-      item_id: id,
-      requester_id: userId,
-      status: "pending",
+    const { error } = await supabase.rpc("request_item", {
+      p_item_id: id,
+      p_user_id: userId,
     });
 
+    await loadItem();
     setRequesting(false);
 
-    if (!error) {
-      setHasRequested(true);
-    } else {
-      alert("You have already requested this item");
-    }
+    // ❌ NO ALERT LOOP
+    // UI state now comes ONLY from item.is_locked
   }
 
   async function deleteItem() {
@@ -96,7 +88,7 @@ export default function ItemDetailsPage() {
     router.push(backUrl);
   }
 
-  if (loading) {
+  if (loading || !item) {
     return (
       <div style={{ padding: 40, textAlign: "center", color: "#666" }}>
         Loading item…
@@ -105,6 +97,8 @@ export default function ItemDetailsPage() {
   }
 
   const isOwner = userId === item.owner_id;
+  const isLocked = item.is_locked === true;
+  const isLoggedIn = !!userId;
 
   return (
     <main
@@ -130,7 +124,6 @@ export default function ItemDetailsPage() {
         ← Back to results
       </button>
 
-      {/* TWO COLUMN LAYOUT */}
       <div
         style={{
           display: "grid",
@@ -199,7 +192,24 @@ export default function ItemDetailsPage() {
             </p>
           </div>
 
-          {/* ACTIONS */}
+          {/* 🔐 LOCKED — ONLY FOR LOGGED-IN USERS */}
+          {!isOwner && isLoggedIn && isLocked && (
+            <div
+              style={{
+                marginBottom: 16,
+                padding: 14,
+                background: "#f3f4f6",
+                color: "#555",
+                borderRadius: 14,
+                fontWeight: 600,
+                textAlign: "center",
+              }}
+            >
+              🚫 This item has already been requested
+            </div>
+          )}
+
+          {/* 🗑 OWNER */}
           {isOwner && (
             <button
               onClick={deleteItem}
@@ -219,7 +229,28 @@ export default function ItemDetailsPage() {
             </button>
           )}
 
-          {!isOwner && !hasRequested && (
+          {/* 👤 NOT LOGGED IN → CTA */}
+          {!isOwner && !isLoggedIn && (
+            <button
+              onClick={() => router.push(`/login?redirect=/item/${id}`)}
+              style={{
+                width: "100%",
+                padding: "14px",
+                background: "#16a34a",
+                color: "#fff",
+                border: "none",
+                borderRadius: 14,
+                fontSize: 16,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Request Item
+            </button>
+          )}
+
+          {/* 👤 LOGGED IN & AVAILABLE */}
+          {!isOwner && isLoggedIn && !isLocked && (
             <button
               onClick={requestItem}
               disabled={requesting}
@@ -238,22 +269,6 @@ export default function ItemDetailsPage() {
             >
               {requesting ? "Requesting…" : "Request Item"}
             </button>
-          )}
-
-          {!isOwner && hasRequested && (
-            <div
-              style={{
-                marginTop: 16,
-                padding: 14,
-                background: "#ecfdf5",
-                color: "#065f46",
-                borderRadius: 14,
-                fontWeight: 600,
-                textAlign: "center",
-              }}
-            >
-              ✅ Item already requested
-            </div>
           )}
         </div>
       </div>

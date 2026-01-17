@@ -16,7 +16,6 @@ export default function HomePage() {
 
   const [items, setItems] = useState<any[]>([]);
   const [filteredItems, setFilteredItems] = useState<any[]>([]);
-  const [requestedItemIds, setRequestedItemIds] = useState<Set<string>>(new Set());
   const [userId, setUserId] = useState<string | null>(null);
 
   /* 🔁 RESTORE STATE FROM URL */
@@ -37,15 +36,11 @@ export default function HomePage() {
     router.replace(`/?${params.toString()}`, { scroll: false });
   }, [page, category, search, router]);
 
-  /* ✅ SAVE RESULTS STATE FOR BACK NAVIGATION (PRODUCTION SAFE) */
+  /* ✅ SAVE RESULTS STATE */
   useEffect(() => {
     sessionStorage.setItem(
       "deklata:lastResults",
-      JSON.stringify({
-        page,
-        category,
-        q: search,
-      })
+      JSON.stringify({ page, category, q: search })
     );
   }, [page, category, search]);
 
@@ -59,10 +54,10 @@ export default function HomePage() {
         const from = (page - 1) * PAGE_SIZE;
         const to = from + PAGE_SIZE - 1;
 
-        const { data: itemsData, count, error } = await supabase
+        const { data, count, error } = await supabase
           .from("items")
           .select(
-            "id, name, description, category, pickup_location, owner_id",
+            "id, name, description, category, pickup_location, owner_id, is_locked",
             { count: "exact" }
           )
           .eq("status", "available")
@@ -70,8 +65,8 @@ export default function HomePage() {
           .range(from, to);
 
         if (!cancelled) {
-          setItems(itemsData || []);
-          setFilteredItems(itemsData || []);
+          setItems(data || []);
+          setFilteredItems(data || []);
           setTotalCount(count || 0);
           setLoading(false);
         }
@@ -79,20 +74,9 @@ export default function HomePage() {
         if (error) console.error(error);
 
         supabase.auth.getUser().then(({ data }) => {
-          if (!data?.user || cancelled) return;
-
-          setUserId(data.user.id);
-
-          supabase
-            .from("requests")
-            .select("item_id")
-            .eq("requester_id", data.user.id)
-            .in("status", ["pending", "approved"])
-            .then(({ data: requests }) => {
-              if (!cancelled && requests) {
-                setRequestedItemIds(new Set(requests.map((r) => r.item_id)));
-              }
-            });
+          if (!cancelled && data?.user) {
+            setUserId(data.user.id);
+          }
         });
       } catch (err) {
         console.error(err);
@@ -228,7 +212,9 @@ export default function HomePage() {
       >
         {filteredItems.map((item) => {
           const isOwner = userId === item.owner_id;
-          const isRequested = requestedItemIds.has(item.id);
+          const isLoggedIn = !!userId;
+          const isRequested =isLoggedIn &&
+          item.is_locked === true;
 
           return (
             <div
