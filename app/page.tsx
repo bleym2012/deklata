@@ -1,5 +1,18 @@
 "use client";
 
+
+<div style={{ position: "fixed", bottom: 10, right: 10, fontSize: 12, color: "red" }}>
+  PROD-BUILD-TEST-123
+</div>
+
+
+
+
+
+
+
+
+
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
