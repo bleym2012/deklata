@@ -2,6 +2,7 @@
 
 export const dynamic = "force-dynamic";
 export const fetchcache = "force-no-store";
+export const revalidate = 0;
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
