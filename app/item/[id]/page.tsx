@@ -11,7 +11,6 @@ export default function ItemDetailsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  /* 🔁 RESTORE HOMEPAGE STATE */
   const page = searchParams.get("page") || "1";
   const category = searchParams.get("category") || "all";
   const q = searchParams.get("q") || "";
@@ -36,8 +35,7 @@ export default function ItemDetailsPage() {
       data: { user },
     } = await supabase.auth.getUser();
 
-    if (user) setUserId(user.id);
-    else setUserId(null);
+    setUserId(user ? user.id : null);
 
     const { data: itemData } = await supabase
       .from("items")
@@ -56,7 +54,6 @@ export default function ItemDetailsPage() {
   }
 
   async function requestItem() {
-    // 🚨 NOT LOGGED IN → REDIRECT (NO ALERT)
     if (!userId) {
       router.push(`/login?redirect=/item/${id}`);
       return;
@@ -66,16 +63,13 @@ export default function ItemDetailsPage() {
 
     setRequesting(true);
 
-    const { error } = await supabase.rpc("request_item", {
+    await supabase.rpc("request_item", {
       p_item_id: id,
       p_user_id: userId,
     });
 
     await loadItem();
     setRequesting(false);
-
-    // ❌ NO ALERT LOOP
-    // UI state now comes ONLY from item.is_locked
   }
 
   async function deleteItem() {
@@ -109,7 +103,7 @@ export default function ItemDetailsPage() {
         fontFamily: "system-ui, -apple-system, BlinkMacSystemFont",
       }}
     >
-      {/* 🔙 BACK TO RESULTS */}
+      {/* 🔙 BACK */}
       <button
         onClick={() => router.push(backUrl)}
         style={{
@@ -124,17 +118,18 @@ export default function ItemDetailsPage() {
         ← Back to results
       </button>
 
+      {/* 🔁 RESPONSIVE LAYOUT */}
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: "1.2fr 1fr",
-          gap: 40,
-          alignItems: "flex-start",
+          display: "flex",
+          flexDirection: "column",
+          gap: 32,
         }}
       >
-        {/* 🖼 IMAGE CAROUSEL */}
+        {/* 🖼 IMAGE CAROUSEL — FULL WIDTH */}
         <div
           style={{
+            width: "100%",
             display: "flex",
             overflowX: "auto",
             scrollSnapType: "x mandatory",
@@ -192,7 +187,6 @@ export default function ItemDetailsPage() {
             </p>
           </div>
 
-          {/* 🔐 LOCKED — ONLY FOR LOGGED-IN USERS */}
           {!isOwner && isLoggedIn && isLocked && (
             <div
               style={{
@@ -209,7 +203,6 @@ export default function ItemDetailsPage() {
             </div>
           )}
 
-          {/* 🗑 OWNER */}
           {isOwner && (
             <button
               onClick={deleteItem}
@@ -229,7 +222,6 @@ export default function ItemDetailsPage() {
             </button>
           )}
 
-          {/* 👤 NOT LOGGED IN → CTA */}
           {!isOwner && !isLoggedIn && (
             <button
               onClick={() => router.push(`/login?redirect=/item/${id}`)}
@@ -249,7 +241,6 @@ export default function ItemDetailsPage() {
             </button>
           )}
 
-          {/* 👤 LOGGED IN & AVAILABLE */}
           {!isOwner && isLoggedIn && !isLocked && (
             <button
               onClick={requestItem}
@@ -272,6 +263,24 @@ export default function ItemDetailsPage() {
           )}
         </div>
       </div>
+
+      {/* 🖥 DESKTOP ENHANCEMENT */}
+      <style jsx>{`
+        @media (min-width: 1024px) {
+          main > div {
+            flex-direction: row;
+            align-items: flex-start;
+          }
+
+          main > div > div:first-child {
+            flex: 1.2;
+          }
+
+          main > div > div:last-child {
+            flex: 1;
+          }
+        }
+      `}</style>
     </main>
   );
 }
