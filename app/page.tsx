@@ -23,6 +23,9 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
 
+  /* ✅ MOBILE FILTER TOGGLE */
+  const [showFilters, setShowFilters] = useState(false);
+
   /* 🔁 RESTORE STATE FROM URL */
   useEffect(() => {
     setSearch(searchParams.get("q") || "");
@@ -101,7 +104,6 @@ export default function HomePage() {
     }
 
     loadHomeDataSafe();
-
     return () => {
       cancelled = true;
     };
@@ -112,9 +114,7 @@ export default function HomePage() {
     let result = [...items];
 
     if (category !== "all") {
-      result = result.filter(
-        (item) => item.category_id === category
-      );
+      result = result.filter((item) => item.category_id === category);
     }
 
     if (search.trim()) {
@@ -153,6 +153,9 @@ export default function HomePage() {
   const endItem = Math.min(page * PAGE_SIZE, totalCount);
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
+  const isMobile =
+    typeof window !== "undefined" && window.innerWidth < 768;
+
   return (
     <main style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 20px" }}>
       {/* 🔍 SEARCH */}
@@ -166,19 +169,46 @@ export default function HomePage() {
         style={{
           width: "100%",
           padding: "14px 16px",
-          marginBottom: 18,
+          marginBottom: 12,
           borderRadius: 10,
           border: "1px solid #e5e7eb",
           fontSize: 15,
         }}
       />
 
+      {/* ☰ CATEGORY TOGGLE (MOBILE) */}
+      {isMobile && (
+        <button
+          onClick={() => setShowFilters((v) => !v)}
+          style={{
+            marginBottom: 16,
+            padding: "10px 14px",
+            borderRadius: 10,
+            border: "1px solid #e5e7eb",
+            background: "var(--background)",
+            color: "var(--foreground)",
+            fontSize: 14,
+            cursor: "pointer",
+          }}
+        >
+          ☰ Categories
+        </button>
+      )}
+
       {/* 🏷 CATEGORIES */}
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 24 }}>
+      <div
+        style={{
+          display: !isMobile || showFilters ? "flex" : "none",
+          gap: 10,
+          flexWrap: "wrap",
+          marginBottom: 24,
+        }}
+      >
         <button
           onClick={() => {
             setCategory("all");
             setPage(1);
+            if (isMobile) setShowFilters(false);
           }}
           style={{
             padding: "8px 16px",
@@ -199,6 +229,7 @@ export default function HomePage() {
             onClick={() => {
               setCategory(cat.id);
               setPage(1);
+              if (isMobile) setShowFilters(false);
             }}
             style={{
               padding: "8px 16px",
@@ -246,25 +277,25 @@ export default function HomePage() {
                 position: "relative",
               }}
             >
-
               {!isOwner && isRequested && (
-  <span
-    style={{
-      position: "absolute",
-      top: 12,
-      right: 12,
-      background: "#2563eb",
-      color: "#ffffff",
-      padding: "4px 10px",
-      fontSize: 12,
-      borderRadius: 999,
-      fontWeight: 600,
-      zIndex: 10,
-    }}
-  >
-    Requested
-  </span>
-)}
+                <span
+                  style={{
+                    position: "absolute",
+                    top: 12,
+                    right: 12,
+                    background: "#2563eb",
+                    color: "#ffffff",
+                    padding: "4px 10px",
+                    fontSize: 12,
+                    borderRadius: 999,
+                    fontWeight: 600,
+                    zIndex: 10,
+                  }}
+                >
+                  Requested
+                </span>
+              )}
+
               <Link href={`/item/${item.id}`} style={{ color: "inherit" }}>
                 <h3 style={{ fontSize: 18, fontWeight: 600 }}>{item.name}</h3>
                 <p style={{ fontSize: 14, color: "#555", margin: "8px 0" }}>
@@ -284,7 +315,15 @@ export default function HomePage() {
       </div>
 
       {/* 🔢 PAGINATION */}
-      <div style={{ marginTop: 32, display: "flex", justifyContent: "center", gap: 8 }}>
+      <div
+        style={{
+          marginTop: 32,
+          display: "flex",
+          justifyContent: "center",
+          gap: 8,
+          flexWrap: "wrap",
+        }}
+      >
         {Array.from({ length: totalPages }).map((_, i) => (
           <button
             key={i}
