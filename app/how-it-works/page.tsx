@@ -103,11 +103,11 @@ export default function HowItWorksPage() {
             <strong>After approval:</strong>
             <ul style={{ marginTop: 8 }}>
               <li>
-                The <strong>owner’s contact</strong> becomes visible to the
+                The <strong>owner’s name and contact</strong> becomes visible to the
                 requester on <strong>My Requests</strong>.
               </li>
               <li>
-                The <strong>requester’s contact</strong> becomes visible to the
+                The <strong>requester’s name and contact</strong> becomes visible to the
                 owner on the <strong>Owner Dashboard</strong>.
               </li>
               <li>The item is removed from the public homepage.</li>
@@ -151,7 +151,7 @@ export default function HowItWorksPage() {
           </li>
           <li>
             The <strong>giver (item owner)</strong> is automatically rewarded
-            with <strong>Deklata Points</strong>.
+            with <strong>Deklata Points</strong>which can be seen on their profile.
           </li>
           <li>
             Points are earned only for <strong>successful, confirmed exchanges</strong>.
