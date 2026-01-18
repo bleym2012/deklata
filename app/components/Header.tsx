@@ -175,8 +175,9 @@ export default function Header() {
             background: "none",
             border: "none",
             cursor: "pointer",
-            fontSize: 22,
+            fontSize: 24,
             lineHeight: 1,
+            color: "var(--foreground",
           }}
         >
           ☰
