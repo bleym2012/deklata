@@ -23,6 +23,9 @@ export default function ItemDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [requesting, setRequesting] = useState(false);
 
+  /* ✅ NEW: active image index */
+  const [activeIndex, setActiveIndex] = useState(0);
+
   useEffect(() => {
     loadItem();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -50,6 +53,7 @@ export default function ItemDetailsPage() {
 
     setItem(itemData);
     setImages(imageData || []);
+    setActiveIndex(0);
     setLoading(false);
   }
 
@@ -126,32 +130,55 @@ export default function ItemDetailsPage() {
           gap: 32,
         }}
       >
-        {/* 🖼 IMAGE CAROUSEL — FULL WIDTH */}
-        <div
-          style={{
-            width: "100%",
-            display: "flex",
-            overflowX: "auto",
-            scrollSnapType: "x mandatory",
-            gap: 16,
-            paddingBottom: 10,
-          }}
-        >
-          {images.map((img) => (
-            <img
-              key={img.id}
-              src={img.image_url}
-              alt={item.name}
+        {/* 🖼 IMAGE CAROUSEL */}
+        <div>
+          <div
+            onScroll={(e) => {
+              const scrollLeft = e.currentTarget.scrollLeft;
+              const width = e.currentTarget.clientWidth;
+              const index = Math.round(scrollLeft / width);
+              setActiveIndex(index);
+            }}
+            style={{
+              width: "100%",
+              display: "flex",
+              overflowX: "auto",
+              scrollSnapType: "x mandatory",
+              gap: 16,
+              paddingBottom: 10,
+            }}
+          >
+            {images.map((img) => (
+              <img
+                key={img.id}
+                src={img.image_url}
+                alt={item.name}
+                style={{
+                  minWidth: "100%",
+                  height: 420,
+                  objectFit: "cover",
+                  borderRadius: 18,
+                  scrollSnapAlign: "start",
+                  boxShadow: "0 12px 30px rgba(0,0,0,0.12)",
+                }}
+              />
+            ))}
+          </div>
+
+          {/* ✅ IMAGE COUNT */}
+          {images.length > 1 && (
+            <div
               style={{
-                minWidth: "100%",
-                height: 420,
-                objectFit: "cover",
-                borderRadius: 18,
-                scrollSnapAlign: "start",
-                boxShadow: "0 12px 30px rgba(0,0,0,0.12)",
+                marginTop: 8,
+                textAlign: "center",
+                fontSize: 13,
+                color: "#666",
+                fontWeight: 500,
               }}
-            />
-          ))}
+            >
+              {activeIndex + 1} of {images.length}
+            </div>
+          )}
         </div>
 
         {/* 📄 DETAILS */}
