@@ -1,5 +1,4 @@
 "use client";
-
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
@@ -7,7 +6,6 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "./lib/supabaseClient";
 
-const CATEGORIES = ["all", "books", "electronics", "furniture", "others"];
 const PAGE_SIZE = 20;
 
 export default function HomePage() {
@@ -16,17 +14,16 @@ export default function HomePage() {
 
   const [items, setItems] = useState<any[]>([]);
   const [filteredItems, setFilteredItems] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
 
-  /* 🔁 STATE (INITIALIZED SAFELY — NO BUILD ACCESS) */
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
   const [page, setPage] = useState(1);
-
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
 
-  /* 🔁 RESTORE STATE FROM URL (RUNTIME ONLY) */
+  /* 🔁 RESTORE STATE FROM URL */
   useEffect(() => {
     setSearch(searchParams.get("q") || "");
     setCategory(searchParams.get("category") || "all");
@@ -39,19 +36,19 @@ export default function HomePage() {
     if (page > 1) params.set("page", String(page));
     if (category !== "all") params.set("category", category);
     if (search.trim()) params.set("q", search);
-
     router.replace(`/?${params.toString()}`, { scroll: false });
   }, [page, category, search, router]);
 
-  /* ✅ SAVE RESULTS STATE (CLIENT ONLY) */
+  /* 🔄 LOAD CATEGORIES */
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    sessionStorage.setItem(
-      "deklata:lastResults",
-      JSON.stringify({ page, category, q: search })
-    );
-  }, [page, category, search]);
+    supabase
+      .from("categories")
+      .select("id, name")
+      .order("name")
+      .then(({ data }) => {
+        setCategories(data || []);
+      });
+  }, []);
 
   /* 🔄 LOAD ITEMS */
   useEffect(() => {
@@ -67,7 +64,16 @@ export default function HomePage() {
         const { data, count, error } = await supabase
           .from("items")
           .select(
-            "id, name, description, category, pickup_location, owner_id, is_locked",
+            `
+            id,
+            name,
+            description,
+            pickup_location,
+            owner_id,
+            is_locked,
+            category_id,
+            categories ( id, name )
+          `,
             { count: "exact" }
           )
           .eq("status", "available")
@@ -96,13 +102,8 @@ export default function HomePage() {
 
     loadHomeDataSafe();
 
-    const timeout = setTimeout(() => {
-      if (!cancelled) setLoading(false);
-    }, 5000);
-
     return () => {
       cancelled = true;
-      clearTimeout(timeout);
     };
   }, [page]);
 
@@ -112,9 +113,7 @@ export default function HomePage() {
 
     if (category !== "all") {
       result = result.filter(
-        (item) =>
-          item.category &&
-          item.category.toLowerCase() === category.toLowerCase()
+        (item) => item.category_id === category
       );
     }
 
@@ -130,7 +129,7 @@ export default function HomePage() {
     setFilteredItems(result);
   }, [search, category, items]);
 
-  /* 🦴 SKELETON */
+  /* 🦴 LOADING */
   if (loading) {
     return (
       <main style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 20px" }}>
@@ -155,17 +154,9 @@ export default function HomePage() {
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   return (
-    <main
-      style={{
-        maxWidth: 1200,
-        margin: "0 auto",
-        padding: "32px 20px",
-        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont",
-      }}
-    >
+    <main style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 20px" }}>
       {/* 🔍 SEARCH */}
       <input
-        type="text"
         placeholder="Search items..."
         value={search}
         onChange={(e) => {
@@ -184,24 +175,42 @@ export default function HomePage() {
 
       {/* 🏷 CATEGORIES */}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 24 }}>
-        {CATEGORIES.map((cat) => (
+        <button
+          onClick={() => {
+            setCategory("all");
+            setPage(1);
+          }}
+          style={{
+            padding: "8px 16px",
+            borderRadius: 999,
+            border: "1px solid #e5e7eb",
+            background: category === "all" ? "#111" : "#fff",
+            color: category === "all" ? "#fff" : "#111",
+            fontSize: 14,
+            cursor: "pointer",
+          }}
+        >
+          All
+        </button>
+
+        {categories.map((cat) => (
           <button
-            key={cat}
+            key={cat.id}
             onClick={() => {
-              setCategory(cat);
+              setCategory(cat.id);
               setPage(1);
             }}
             style={{
               padding: "8px 16px",
               borderRadius: 999,
               border: "1px solid #e5e7eb",
-              background: category === cat ? "#111" : "#fff",
-              color: category === cat ? "#fff" : "#111",
+              background: category === cat.id ? "#111" : "#fff",
+              color: category === cat.id ? "#fff" : "#111",
               fontSize: 14,
               cursor: "pointer",
             }}
           >
-            {cat.charAt(0).toUpperCase() + cat.slice(1)}
+            {cat.name}
           </button>
         ))}
       </div>
@@ -222,8 +231,7 @@ export default function HomePage() {
       >
         {filteredItems.map((item) => {
           const isOwner = userId === item.owner_id;
-          const isLoggedIn = !!userId;
-          const isRequested = isLoggedIn && item.is_locked === true;
+          const isRequested = userId && item.is_locked;
 
           return (
             <div
@@ -238,30 +246,33 @@ export default function HomePage() {
                 position: "relative",
               }}
             >
-              {!isOwner && isRequested && (
-                <span
-                  style={{
-                    position: "absolute",
-                    top: 12,
-                    right: 12,
-                    background: "#f3f4f6",
-                    color: "#555",
-                    padding: "4px 10px",
-                    fontSize: 12,
-                    borderRadius: 999,
-                  }}
-                >
-                  Requested
-                </span>
-              )}
 
+              {!isOwner && isRequested && (
+  <span
+    style={{
+      position: "absolute",
+      top: 12,
+      right: 12,
+      background: "#2563eb",
+      color: "#ffffff",
+      padding: "4px 10px",
+      fontSize: 12,
+      borderRadius: 999,
+      fontWeight: 600,
+      zIndex: 10,
+    }}
+  >
+    Requested
+  </span>
+)}
               <Link href={`/item/${item.id}`} style={{ color: "inherit" }}>
                 <h3 style={{ fontSize: 18, fontWeight: 600 }}>{item.name}</h3>
                 <p style={{ fontSize: 14, color: "#555", margin: "8px 0" }}>
                   {item.description}
                 </p>
                 <p style={{ fontSize: 13, color: "#666" }}>
-                  <strong>Category:</strong> {item.category}
+                  <strong>Category:</strong>{" "}
+                  {item.categories?.name || "Uncategorized"}
                 </p>
                 <p style={{ fontSize: 13, color: "#666" }}>
                   <strong>Pickup:</strong> {item.pickup_location}
@@ -273,15 +284,7 @@ export default function HomePage() {
       </div>
 
       {/* 🔢 PAGINATION */}
-      <div
-        style={{
-          marginTop: 32,
-          display: "flex",
-          justifyContent: "center",
-          gap: 8,
-          flexWrap: "wrap",
-        }}
-      >
+      <div style={{ marginTop: 32, display: "flex", justifyContent: "center", gap: 8 }}>
         {Array.from({ length: totalPages }).map((_, i) => (
           <button
             key={i}

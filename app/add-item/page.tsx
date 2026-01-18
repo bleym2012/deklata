@@ -4,13 +4,21 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabaseClient";
 
+type Category = {
+  id: string;
+  name: string;
+};
+
 export default function AddItemPage() {
   const router = useRouter();
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("");
+  const [categoryId, setCategoryId] = useState("");
   const [pickupLocation, setPickupLocation] = useState("");
+
+  const [categories, setCategories] = useState<Category[]>([]);
+
   const [images, setImages] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [fileInputKey, setFileInputKey] = useState(Date.now());
@@ -18,8 +26,12 @@ export default function AddItemPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /* ---------------------------------
+     AUTH + LOAD CATEGORIES
+  ----------------------------------*/
   useEffect(() => {
     checkUser();
+    loadCategories();
   }, []);
 
   async function checkUser() {
@@ -30,6 +42,20 @@ export default function AddItemPage() {
     if (!user) router.push("/login");
   }
 
+  async function loadCategories() {
+    const { data, error } = await supabase
+      .from("categories")
+      .select("id, name")
+      .order("name", { ascending: true });
+
+    if (!error && data) {
+      setCategories(data);
+    }
+  }
+
+  /* ---------------------------------
+     IMAGE HANDLING
+  ----------------------------------*/
   function handleImageSelect(files: FileList) {
     const selected = Array.from(files).slice(0, 3);
     setImages(selected);
@@ -43,12 +69,14 @@ export default function AddItemPage() {
     setImages(newImages);
     setPreviewUrls(newPreviews);
 
-    // Reset input if empty
     if (newImages.length === 0) {
       setFileInputKey(Date.now());
     }
   }
 
+  /* ---------------------------------
+     SUBMIT
+  ----------------------------------*/
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -64,14 +92,14 @@ export default function AddItemPage() {
       return;
     }
 
-    // 1️⃣ Create item
+    // 1️⃣ CREATE ITEM
     const { data: item, error: itemError } = await supabase
       .from("items")
       .insert({
         owner_id: user.id,
         name,
         description,
-        category: category.toLowerCase(), 
+        category_id: categoryId,
         pickup_location: pickupLocation,
       })
       .select()
@@ -83,7 +111,7 @@ export default function AddItemPage() {
       return;
     }
 
-    // 2️⃣ Upload images
+    // 2️⃣ UPLOAD IMAGES
     for (const image of images) {
       const filePath = `${item.id}/${Date.now()}-${image.name}`;
 
@@ -109,6 +137,9 @@ export default function AddItemPage() {
     router.push("/");
   }
 
+  /* ---------------------------------
+     UI (UNCHANGED STYLES)
+  ----------------------------------*/
   return (
     <main style={{ maxWidth: 520, margin: "40px auto", padding: 20 }}>
       <h1 style={{ fontSize: 28 }}>Add Item</h1>
@@ -117,7 +148,6 @@ export default function AddItemPage() {
       </p>
 
       <form onSubmit={handleSubmit} style={{ display: "grid", gap: 16 }}>
-        {/* Item name */}
         <input
           placeholder="Item name"
           value={name}
@@ -126,7 +156,6 @@ export default function AddItemPage() {
           style={inputStyle}
         />
 
-        {/* Description */}
         <textarea
           placeholder="Item description"
           value={description}
@@ -136,22 +165,21 @@ export default function AddItemPage() {
           style={{ ...inputStyle, resize: "vertical" }}
         />
 
-        {/* Category */}
+        {/* CATEGORY — DATABASE DRIVEN */}
         <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
+          value={categoryId}
+          onChange={(e) => setCategoryId(e.target.value)}
           required
           style={inputStyle}
         >
           <option value="">Select category</option>
-          <option value="books">Books</option>
-          <option value="furniture">Furniture</option>
-          <option value="electronics">Electronics</option>
-          <option value="clothing">Clothing</option>
-          <option value="others">Others</option>
+          {categories.map((cat) => (
+            <option key={cat.id} value={cat.id}>
+              {cat.name}
+            </option>
+          ))}
         </select>
 
-        {/* Pickup */}
         <input
           placeholder="Pickup location"
           value={pickupLocation}
@@ -160,7 +188,7 @@ export default function AddItemPage() {
           style={inputStyle}
         />
 
-        {/* Image upload */}
+        {/* IMAGE UPLOAD */}
         <div>
           <input
             key={fileInputKey}
@@ -182,7 +210,6 @@ export default function AddItemPage() {
             📸 Choose images (max 3)
           </button>
 
-          {/* Preview */}
           {previewUrls.length > 0 && (
             <div
               style={{
@@ -196,6 +223,7 @@ export default function AddItemPage() {
                 <div key={url} style={{ position: "relative" }}>
                   <img
                     src={url}
+                    alt=""
                     style={{
                       width: "100%",
                       height: 100,
@@ -227,7 +255,6 @@ export default function AddItemPage() {
           )}
         </div>
 
-        {/* Submit */}
         <button
           disabled={loading}
           style={{
@@ -251,6 +278,9 @@ export default function AddItemPage() {
   );
 }
 
+/* ---------------------------------
+   STYLES (UNCHANGED)
+----------------------------------*/
 const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: 12,
@@ -262,7 +292,9 @@ const uploadButtonStyle: React.CSSProperties = {
   padding: 12,
   width: "100%",
   borderRadius: 12,
-  border: "1px dashed #cbd5e1",
-  background: "#f8fafc",
+  border: "1px dashed #94A3B8",
+  background: "transparent",
+  color: "inherit",
+  fontWeight: 450,
   cursor: "pointer",
 };
