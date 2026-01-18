@@ -35,27 +35,48 @@ export default function Header() {
 
   const NavLinks = () => (
     <>
+      {/* 1️⃣ HOW IT WORKS */}
       <Link href="/how-it-works" onClick={() => setMenuOpen(false)}>
         How it works
       </Link>
 
+      {/* LOGGED IN LINKS */}
+      {user && (
+        <>
+          {/* 2️⃣ ADD ITEM */}
+          <Link href="/add-item" onClick={() => setMenuOpen(false)}>
+            Add item
+          </Link>
+
+          {/* 3️⃣ DASHBOARD */}
+          <Link href="/dashboard" onClick={() => setMenuOpen(false)}>
+            Dashboard
+          </Link>
+
+          {/* 4️⃣ MY REQUESTS */}
+          <Link href="/my-requests" onClick={() => setMenuOpen(false)}>
+            My requests
+          </Link>
+
+          {/* 5️⃣ PROFILE */}
+          <Link href="/profile" onClick={() => setMenuOpen(false)}>
+            Profile
+          </Link>
+        </>
+      )}
+
+      {/* 6️⃣ CONTACT US */}
       <Link href="/contact" onClick={() => setMenuOpen(false)}>
         Contact us
       </Link>
-      
 
-
-
-
-
-
-
-
+      {/* LOGGED OUT */}
       {!user && (
         <>
           <Link href="/login" onClick={() => setMenuOpen(false)}>
             Login
           </Link>
+
           <Link
             href="/register"
             onClick={() => setMenuOpen(false)}
@@ -73,31 +94,21 @@ export default function Header() {
         </>
       )}
 
+      {/* 7️⃣ LOGOUT */}
       {user && (
-        <>
-          <Link href="/add-item" onClick={() => setMenuOpen(false)}>
-            Add item
-          </Link>
-          <Link href="/dashboard" onClick={() => setMenuOpen(false)}>
-            Dashboard
-          </Link>
-          <Link href="/my-requests" onClick={() => setMenuOpen(false)}>
-            My requests
-          </Link>
-          <button
-            onClick={handleLogout}
-            style={{
-              background: "none",
-              border: "none",
-              color: "#dc2626",
-              fontWeight: 600,
-              cursor: "pointer",
-              padding: 0,
-            }}
-          >
-            Logout
-          </button>
-        </>
+        <button
+          onClick={handleLogout}
+          style={{
+            background: "none",
+            border: "none",
+            color: "#dc2626",
+            fontWeight: 600,
+            cursor: "pointer",
+            padding: 0,
+          }}
+        >
+          Logout
+        </button>
       )}
     </>
   );
@@ -117,7 +128,7 @@ export default function Header() {
         style={{
           maxWidth: 1200,
           margin: "0 auto",
-          padding: "8px 20px", // ✅ reduced height
+          padding: "8px 20px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -137,7 +148,7 @@ export default function Header() {
           <Image
             src="/images/deklata-logo.svg"
             alt="Deklata"
-            width={120}   // ✅ optically correct
+            width={120}
             height={32}
             priority
           />

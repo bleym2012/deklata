@@ -5,8 +5,17 @@
    ================================ */
 
 :root {
+  /* LIGHT MODE COLORS */
   --background: #ffffff;
   --foreground: #171717;
+
+  --card-bg: #ffffff;
+  --card-border: #e5e7eb;
+  --muted-text: #6b7280;
+  --link: #2563eb;
+  --link-hover: #1d4ed8;
+  --button-bg: #2563eb;
+  --button-text: #ffffff;
 
   /* Mobile-first typography scale */
   --font-xs: 12px;
@@ -31,11 +40,22 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* Dark mode */
+/* ================================
+   🌙 SYSTEM DARK MODE
+   ================================ */
+
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #020617; /* slate-950 */
+    --foreground: #e5e7eb; /* gray-200 */
+
+    --card-bg: #020617;
+    --card-border: #1e293b;
+    --muted-text: #9ca3af;
+    --link: #60a5fa;
+    --link-hover: #93c5fd;
+    --button-bg: #1e293b;
+    --button-text: #e5e7eb;
   }
 }
 
@@ -72,9 +92,44 @@ h3 {
   font-size: var(--font-lg);
   line-height: var(--lh-tight);
 }
-p {
+p,
+li,
+span {
   font-size: var(--font-base);
   line-height: var(--lh-relaxed);
+  color: var(--foreground);
+}
+
+/* Links */
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--link-hover);
+}
+
+/* Cards / Sections (covers inline styles too) */
+section,
+main > div,
+.card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--card-border);
+}
+
+/* Inputs */
+input,
+textarea,
+select {
+  background-color: var(--card-bg);
+  color: var(--foreground);
+  border: 1px solid var(--card-border);
+}
+
+/* Buttons */
+button {
+  background-color: var(--button-bg);
+  color: var(--button-text);
 }
 
 /* ================================
@@ -93,7 +148,10 @@ p {
   }
 }
 
-/* Responsive */
+/* ================================
+   RESPONSIVE
+   ================================ */
+
 @media (min-width: 768px) {
   html {
     font-size: 16px;

@@ -12,10 +12,27 @@ export default function OwnerDashboard() {
   const [profiles, setProfiles] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [completingId, setCompletingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadRequests();
   }, []);
+  
+  async function confirmOwnerGiven(requestId: string) {
+  const { error } = await supabase.rpc(
+    "confirm_owner_given",
+    { p_request_id: requestId }
+  );
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  // 🔁 CRITICAL: reload state
+  loadRequests();
+}
+
 
   async function loadRequests() {
     setLoading(true);
@@ -38,15 +55,24 @@ export default function OwnerDashboard() {
         status,
         requester_id,
         owner_visible,
+        owner_confirmed,
+        requester_confirmed,
         item_id,
         items (
           id,
           name,
-          owner_id
+          owner_id,
+          is_locked,
+          is_completed
         )
       `)
+      
       .eq("items.owner_id", user.id)
-      .in("status", ["pending", "approved"]);
+      .in("status", ["pending", "approved"])
+      .order("created_at", { ascending: false });
+      
+      
+      
 
     if (error) {
       setError(error.message);
@@ -88,25 +114,62 @@ export default function OwnerDashboard() {
 
     await supabase
       .from("items")
-      .update({ status: "approved" })
+      .update({ status: "approved", is_locked: true })
       .eq("id", itemId);
 
     loadRequests();
   }
 
   async function rejectRequest(requestId: string, itemId: string) {
-    await supabase
-      .from("requests")
-      .update({ status: "rejected" })
-      .eq("id", requestId);
+    await supabase.from("requests").update({ status: "rejected" }).eq("id", requestId);
 
     await supabase
       .from("items")
-      .update({ status: "available" })
+      .update({ status: "available", is_locked: false })
       .eq("id", itemId);
 
     loadRequests();
   }
+
+
+  async function completeItem(itemId: string) {
+    setCompletingId(itemId);
+    setError("");
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setError("Not authenticated");
+      setCompletingId(null);
+      return;
+    }
+
+    const { error } = await supabase.rpc("complete_item_and_award_points", {
+      p_item_id: itemId,
+      p_owner_id: user.id,
+    });
+
+    if (error) {
+      setError(error.message);
+      setCompletingId(null);
+      return;
+    }
+
+    setCompletingId(null);
+    loadRequests();
+  }
+
+  async function confirmownerGiven(requestId: string) {
+  await supabase
+    .from("requests")
+    .update({ owner_confirmed: true })
+    .eq("id", requestId);
+
+  loadRequests();
+}
+
 
   return (
     <main
@@ -146,90 +209,121 @@ export default function OwnerDashboard() {
       )}
 
       <div style={{ display: "grid", gap: 16 }}>
-        {requests.map((req) => (
-          <div
-            key={req.id}
-            style={{
-              background: "#fff",
-              borderRadius: 16,
-              padding: 20,
-              boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
-            }}
-          >
-            <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 6 }}>
-              {req.items.name}
-            </h3>
+        {requests.map((req) => {
+          const item = req.items;
 
-            {/* PENDING */}
-            {req.status === "pending" && (
-              <>
-                <p style={{ fontSize: 14, color: "#555", marginBottom: 12 }}>
-                  <strong>Requester ID:</strong> {req.requester_id}
-                </p>
+          return (
+            <div
+              key={req.id}
+              style={{
+                background: "#fff",
+                borderRadius: 16,
+                padding: 20,
+                boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+              }}
+            >
+              <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 6 }}>
+                {item.name}
+              </h3>
 
-                <div style={{ display: "flex", gap: 10 }}>
-                  <button
-                    onClick={() => approveRequest(req.id, req.item_id)}
-                    style={{
-                      flex: 1,
-                      padding: "12px",
-                      borderRadius: 12,
-                      border: "none",
-                      background: "#16a34a",
-                      color: "#fff",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Approve
-                  </button>
-
-                  <button
-                    onClick={() => rejectRequest(req.id, req.item_id)}
-                    style={{
-                      flex: 1,
-                      padding: "12px",
-                      borderRadius: 12,
-                      border: "1px solid #dc2626",
-                      background: "#fff",
-                      color: "#dc2626",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Reject
-                  </button>
-                </div>
-              </>
-            )}
-
-            {/* APPROVED */}
-            {req.status === "approved" &&
-              req.owner_visible &&
-              profiles[req.requester_id] && (
-                <div
-                  style={{
-                    marginTop: 14,
-                    background: "#ecfdf5",
-                    padding: 14,
-                    borderRadius: 12,
-                    color: "#065f46",
-                  }}
-                >
-                  <p style={{ margin: 0, fontWeight: 600 }}>
-                    Request approved
+              {/* PENDING */}
+              {req.status === "pending" && (
+                <>
+                  <p style={{ fontSize: 14, color: "#555", marginBottom: 12 }}>
+                    <strong>Requester ID:</strong> {req.requester_id}
                   </p>
-                  <p style={{ marginTop: 6, fontSize: 14 }}>
-                    <strong>Requester:</strong>{" "}
-                    {profiles[req.requester_id].name}
-                    <br />
-                    <strong>Phone:</strong>{" "}
-                    {profiles[req.requester_id].phone}
-                  </p>
-                </div>
+
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button
+                      onClick={() => approveRequest(req.id, req.item_id)}
+                      style={{
+                        flex: 1,
+                        padding: "12px",
+                        borderRadius: 12,
+                        border: "none",
+                        background: "#16a34a",
+                        color: "#fff",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Approve
+                    </button>
+
+                    <button
+                      onClick={() => rejectRequest(req.id, req.item_id)}
+                      style={{
+                        flex: 1,
+                        padding: "12px",
+                        borderRadius: 12,
+                        border: "1px solid #dc2626",
+                        background: "#fff",
+                        color: "#dc2626",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </>
               )}
-          </div>
-        ))}
+
+              {/* APPROVED */}
+              {req.status === "approved" &&
+                req.owner_visible &&
+                profiles[req.requester_id] && (
+                  <div
+                    style={{
+                      marginTop: 14,
+                      background: "#ecfdf5",
+                      padding: 14,
+                      borderRadius: 12,
+                      color: "#065f46",
+                    }}
+                  >
+                    <p style={{ margin: 0, fontWeight: 600 }}>
+                      Request approved
+                    </p>
+                    <p style={{ marginTop: 6, fontSize: 14 }}>
+                      <strong>Requester:</strong>{" "}
+                      {profiles[req.requester_id].name}
+                      <br />
+                      <strong>Phone:</strong>{" "}
+                      {profiles[req.requester_id].phone}
+                    </p>
+                    
+                    {!req.owner_confirmed && (
+  <button
+    onClick={() => confirmOwnerGiven(req.id)}
+    style={{
+      marginTop: 12,
+      width: "100%",
+      padding: "12px",
+      borderRadius: 12,
+      border: "none",
+      background: "#16a34a",
+      color: "#fff",
+      fontWeight: 700,
+      cursor: "pointer",
+    }}
+  >
+    ✅ Item picked up
+  </button>
+)}
+
+
+                
+                    {item.is_completed && (
+                      <p style={{ marginTop: 12, fontSize: 14 }}>
+                        ✅ Item completed — points awarded
+                      </p>
+                    )}
+                  </div>
+                )}
+            </div>
+          );
+        })}
       </div>
     </main>
   );

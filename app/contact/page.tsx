@@ -6,7 +6,7 @@ import { useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
 export default function ContactPage() {
-  const [type, setType] = useState("suggestion");
+  const [type, setType] = useState("complaint");
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);

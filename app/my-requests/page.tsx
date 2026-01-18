@@ -24,7 +24,7 @@ export default function MyRequestsPage() {
       data: { user },
     } = await supabase.auth.getUser();
 
-    // 🔐 REDIRECT IF NOT LOGGED IN
+    // 🔐 Redirect if not logged in
     if (!user) {
       router.push("/login");
       return;
@@ -32,18 +32,12 @@ export default function MyRequestsPage() {
 
     const { data, error } = await supabase
       .from("requests")
-      .select(`
-        id,
-        status,
-        requester_visible,
-        items (
-          id,
-          name,
-          owner_id
-        )
-      `)
+      .select(
+        "id, status, requester_visible, requester_confirmed, items(id, name, owner_id)"
+      )
       .eq("requester_id", user.id)
-      .eq("status", "approved");
+      .eq("status", "approved")
+      .order("created_at", { ascending: false });
 
     if (error) {
       setError(error.message);
@@ -55,6 +49,20 @@ export default function MyRequestsPage() {
     setLoading(false);
   }
 
+  async function confirmReceived(requestId: string) {
+    const { error } = await supabase.rpc("confirm_requester_received", {
+      p_request_id: requestId,
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    // 🔁 Refresh UI after confirmation
+    loadMyRequests();
+  }
+
   return (
     <main
       style={{
@@ -64,7 +72,7 @@ export default function MyRequestsPage() {
         fontFamily: "system-ui, -apple-system, BlinkMacSystemFont",
       }}
     >
-      {/* 🔙 BACK LINK */}
+      {/* 🔙 Back */}
       <Link
         href="/"
         style={{
@@ -81,6 +89,7 @@ export default function MyRequestsPage() {
       <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 6 }}>
         My Approved Requests
       </h1>
+
       <p style={{ color: "#555", marginBottom: 24 }}>
         Items you’ve successfully requested.
       </p>
@@ -107,12 +116,44 @@ export default function MyRequestsPage() {
               {req.items.name}
             </h3>
 
-            {req.requester_visible ? (
+            {/* Owner contact visible */}
+            {req.requester_visible && (
               <OwnerContact ownerId={req.items.owner_id} />
+            )}
+
+            {/* Requester confirmation */}
+            {!req.requester_confirmed ? (
+              <button
+                onClick={() => confirmReceived(req.id)}
+                style={{
+                  marginTop: 14,
+                  width: "100%",
+                  padding: "14px",
+                  background: "#16a34a",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 14,
+                  fontSize: 16,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                ✓ Item picked up
+              </button>
             ) : (
-              <p style={{ fontSize: 14, color: "#666" }}>
-                Waiting for owner approval…
-              </p>
+              <div
+                style={{
+                  marginTop: 14,
+                  background: "#ecfdf5",
+                  padding: 14,
+                  borderRadius: 12,
+                  color: "#065f46",
+                  fontWeight: 600,
+                  textAlign: "center",
+                }}
+              >
+                ✔ You confirmed receipt
+              </div>
             )}
           </div>
         ))}

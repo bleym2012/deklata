@@ -39,7 +39,7 @@ export default function HowItWorksPage() {
         <p style={{ fontSize: 17, color: "#555", maxWidth: 760 }}>
           Deklata helps students give out items they no longer need to other
           students — <strong>safely</strong>, <strong>fairly</strong>, and{" "}
-          <strong>transparently</strong>.
+          <strong>transparently</strong>, while rewarding generosity.
         </p>
       </section>
 
@@ -54,6 +54,10 @@ export default function HowItWorksPage() {
             To <strong>post an item</strong> or <strong>request an item</strong>,
             you must <strong>create an account or log in</strong>.
           </li>
+          <li>
+            A valid phone number is required to enable safe coordination between
+            students.
+          </li>
         </ul>
       </InfoCard>
 
@@ -64,7 +68,7 @@ export default function HowItWorksPage() {
             <strong>Create an account or log in</strong> to post an item you no
             longer need.
           </li>
-          <li>Add clear photos and a simple, honest description.</li>
+          <li>Add clear photos and an honest description.</li>
           <li>Select the correct category and pickup location.</li>
           <li>
             Once posted, your item becomes visible to other students on the
@@ -77,7 +81,7 @@ export default function HowItWorksPage() {
       <InfoCard title="2. Requesting an Item (Requesters)">
         <ul>
           <li>Browse available items on the homepage.</li>
-          <li>Click on an item to view full details and images.</li>
+          <li>Click an item to view full details.</li>
           <li>You must be <strong>logged in</strong> to request an item.</li>
           <li>
             Click <strong>Request Item</strong> if the item is available.
@@ -94,13 +98,13 @@ export default function HowItWorksPage() {
       <InfoCard title="3. Approval & Contact Sharing">
         <ul>
           <li>The item owner reviews incoming requests.</li>
-          <li>The owner can approve or reject a request.</li>
+          <li>The owner may approve or reject a request.</li>
           <li>
             <strong>After approval:</strong>
             <ul style={{ marginTop: 8 }}>
               <li>
                 The <strong>owner’s contact</strong> becomes visible to the
-                requester on the <strong>My Requests</strong> page.
+                requester on <strong>My Requests</strong>.
               </li>
               <li>
                 The <strong>requester’s contact</strong> becomes visible to the
@@ -109,25 +113,59 @@ export default function HowItWorksPage() {
               <li>The item is removed from the public homepage.</li>
             </ul>
           </li>
-          <li>
-            This allows both students to communicate directly and arrange pickup.
-          </li>
         </ul>
       </InfoCard>
 
       {/* STEP 4 */}
-      <InfoCard title="4. Pickup & Exchange">
+      <InfoCard title="4. Pickup, Confirmation & Fair Exchange">
         <ul>
           <li>
-            The requester contacts the owner via details shown on{" "}
-            <strong>My Requests</strong>.
+            Both students communicate directly and agree on a pickup time and
+            location.
+          </li>
+          <li>The exchange happens offline between students.</li>
+          <li>
+            <strong>After the exchange:</strong>
+            <ul style={{ marginTop: 8 }}>
+              <li>
+                The <strong>owner</strong> confirms the item was given.
+              </li>
+              <li>
+                The <strong>requester</strong> confirms the item was received.
+              </li>
+            </ul>
           </li>
           <li>
-            The owner contacts the requester via the{" "}
-            <strong>Owner Dashboard</strong>.
+            <strong>Both confirmations are required</strong> before the exchange
+            is marked as complete.
           </li>
-          <li>Agree on a convenient pickup time and location.</li>
-          <li>The exchange happens offline between students.</li>
+        </ul>
+      </InfoCard>
+
+      {/* STEP 5 */}
+      <InfoCard title="5. Points, Rewards & Giving Back">
+        <ul>
+          <li>
+            Once <strong>both parties confirm</strong>, the item is marked as
+            completed.
+          </li>
+          <li>
+            The <strong>giver (item owner)</strong> is automatically rewarded
+            with <strong>Deklata Points</strong>.
+          </li>
+          <li>
+            Points are earned only for <strong>successful, confirmed exchanges</strong>.
+          </li>
+      
+          <li>
+            <strong>In the future, Deklata Points can be redeemed for:</strong>
+            <ul style={{ marginTop: 8 }}>
+              <li>🎁 Gift vouchers</li>
+              <li>🏆 Campus rewards & prizes</li>
+              <li>🎉 Special giveaways and partner offers</li>
+              <li>⭐ Recognition for top contributors</li>
+            </ul>
+          </li>
         </ul>
       </InfoCard>
 
@@ -153,18 +191,15 @@ export default function HowItWorksPage() {
 
         <ul style={{ lineHeight: 1.8, paddingLeft: 20 }}>
           <li>
-            Always add a <strong>valid and reachable phone number</strong> when
-            creating your account.
+            Always provide a <strong>valid and reachable phone number</strong>.
           </li>
           <li>
-            Your contact is only shared <strong>after approval</strong> and only
-            with the other party involved.
+            Contact details are shared <strong>only after approval</strong>.
           </li>
-          <li>Meet in public places on campus whenever possible.</li>
-          <li>Do not share sensitive personal information.</li>
+          <li>Meet in public places on campus where possible.</li>
           <li>Inspect items before accepting them.</li>
           <li>
-            If communication feels unclear or unsafe, you are free to walk away.
+            If anything feels unsafe or unclear, you are free to walk away.
           </li>
         </ul>
       </section>
