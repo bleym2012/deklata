@@ -151,7 +151,7 @@ export default function HowItWorksPage() {
           </li>
           <li>
             The <strong>giver (item owner)</strong> is automatically rewarded
-            with <strong>Deklata Points</strong>which can be seen on their profile.
+            with <strong>Deklata Points</strong> which can be seen on their profile.
           </li>
           <li>
             Points are earned only for <strong>successful, confirmed exchanges</strong>.
