@@ -308,7 +308,7 @@ export default function OwnerDashboard() {
       cursor: "pointer",
     }}
   >
-    ✅ Item picked up
+    ✅ Mark item as given
   </button>
 )}
 

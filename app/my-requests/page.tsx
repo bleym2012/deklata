@@ -138,7 +138,7 @@ export default function MyRequestsPage() {
                   cursor: "pointer",
                 }}
               >
-                ✓ Item picked up
+                ✓ Mark item as picked up
               </button>
             ) : (
               <div

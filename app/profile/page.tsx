@@ -151,8 +151,8 @@ export default function ProfilePage() {
             marginBottom: 20,
           }}
         >
-          Profile details are locked for security reasons.
-          Contact support if a correction is required.
+          Profile details are locked.
+          Contact support if you want to make a correction.
         </div>
 
         <button onClick={logout} style={logoutBtn}>

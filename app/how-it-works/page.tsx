@@ -163,7 +163,7 @@ export default function HowItWorksPage() {
               <li>🎁 Gift vouchers</li>
               <li>🏆 Campus rewards & prizes</li>
               <li>🎉 Special giveaways and partner offers</li>
-              <li>⭐ Recognition for top contributors</li>
+              <li>⭐ Recognition for top givers</li>
             </ul>
           </li>
         </ul>
