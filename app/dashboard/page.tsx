@@ -17,22 +17,19 @@ export default function OwnerDashboard() {
   useEffect(() => {
     loadRequests();
   }, []);
-  
+
   async function confirmOwnerGiven(requestId: string) {
-  const { error } = await supabase.rpc(
-    "confirm_owner_given",
-    { p_request_id: requestId }
-  );
+    const { error } = await supabase.rpc("confirm_owner_given", {
+      p_request_id: requestId,
+    });
 
-  if (error) {
-    alert(error.message);
-    return;
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    loadRequests();
   }
-
-  // 🔁 CRITICAL: reload state
-  loadRequests();
-}
-
 
   async function loadRequests() {
     setLoading(true);
@@ -42,7 +39,6 @@ export default function OwnerDashboard() {
       data: { user },
     } = await supabase.auth.getUser();
 
-    // 🔐 REDIRECT IF NOT LOGGED IN
     if (!user) {
       router.push("/login");
       return;
@@ -66,13 +62,9 @@ export default function OwnerDashboard() {
           is_completed
         )
       `)
-      
       .eq("items.owner_id", user.id)
       .in("status", ["pending", "approved"])
       .order("created_at", { ascending: false });
-      
-      
-      
 
     if (error) {
       setError(error.message);
@@ -83,6 +75,7 @@ export default function OwnerDashboard() {
     const safe = (data || []).filter((r) => r.items !== null);
     setRequests(safe);
 
+    // 🔑 FETCH REQUESTER PROFILES MANUALLY (THIS IS CORRECT)
     const requesterIds = safe
       .filter((r) => r.status === "approved" && r.owner_visible)
       .map((r) => r.requester_id);
@@ -94,7 +87,10 @@ export default function OwnerDashboard() {
         .in("id", requesterIds);
 
       const map: Record<string, any> = {};
-      profs?.forEach((p) => (map[p.id] = p));
+      profs?.forEach((p) => {
+        map[p.id] = p;
+      });
+
       setProfiles(map);
     }
 
@@ -108,13 +104,15 @@ export default function OwnerDashboard() {
         status: "approved",
         owner_visible: true,
         requester_visible: true,
+        owner_confirmed: false,
+        requester_confirmed: false,
         approved_at: new Date().toISOString(),
       })
       .eq("id", requestId);
 
     await supabase
       .from("items")
-      .update({ status: "approved", is_locked: true })
+      .update({ is_locked: true, is_completed: false })
       .eq("id", itemId);
 
     loadRequests();
@@ -122,54 +120,9 @@ export default function OwnerDashboard() {
 
   async function rejectRequest(requestId: string, itemId: string) {
     await supabase.from("requests").update({ status: "rejected" }).eq("id", requestId);
-
-    await supabase
-      .from("items")
-      .update({ status: "available", is_locked: false })
-      .eq("id", itemId);
-
+    await supabase.from("items").update({ is_locked: false }).eq("id", itemId);
     loadRequests();
   }
-
-
-  async function completeItem(itemId: string) {
-    setCompletingId(itemId);
-    setError("");
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      setError("Not authenticated");
-      setCompletingId(null);
-      return;
-    }
-
-    const { error } = await supabase.rpc("complete_item_and_award_points", {
-      p_item_id: itemId,
-      p_owner_id: user.id,
-    });
-
-    if (error) {
-      setError(error.message);
-      setCompletingId(null);
-      return;
-    }
-
-    setCompletingId(null);
-    loadRequests();
-  }
-
-  async function confirmownerGiven(requestId: string) {
-  await supabase
-    .from("requests")
-    .update({ owner_confirmed: true })
-    .eq("id", requestId);
-
-  loadRequests();
-}
-
 
   return (
     <main
@@ -180,7 +133,6 @@ export default function OwnerDashboard() {
         fontFamily: "system-ui, -apple-system, BlinkMacSystemFont",
       }}
     >
-      {/* 🔙 BACK LINK */}
       <Link
         href="/"
         style={{
@@ -197,6 +149,7 @@ export default function OwnerDashboard() {
       <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 6 }}>
         Owner Dashboard
       </h1>
+
       <p style={{ color: "#555", marginBottom: 24 }}>
         Manage requests for items you’ve posted.
       </p>
@@ -211,6 +164,7 @@ export default function OwnerDashboard() {
       <div style={{ display: "grid", gap: 16 }}>
         {requests.map((req) => {
           const item = req.items;
+          const requester = profiles[req.requester_id]; // ✅ FINAL FIX
 
           return (
             <div
@@ -270,57 +224,52 @@ export default function OwnerDashboard() {
               )}
 
               {/* APPROVED */}
-              {req.status === "approved" &&
-                req.owner_visible &&
-                profiles[req.requester_id] && (
-                  <div
-                    style={{
-                      marginTop: 14,
-                      background: "#ecfdf5",
-                      padding: 14,
-                      borderRadius: 12,
-                      color: "#065f46",
-                    }}
-                  >
-                    <p style={{ margin: 0, fontWeight: 600 }}>
-                      Request approved
-                    </p>
-                    <p style={{ marginTop: 6, fontSize: 14 }}>
-                      <strong>Requester:</strong>{" "}
-                      {profiles[req.requester_id].name}
-                      <br />
-                      <strong>Phone:</strong>{" "}
-                      {profiles[req.requester_id].phone}
-                    </p>
-                    
-                    {!req.owner_confirmed && (
-  <button
-    onClick={() => confirmOwnerGiven(req.id)}
-    style={{
-      marginTop: 12,
-      width: "100%",
-      padding: "12px",
-      borderRadius: 12,
-      border: "none",
-      background: "#16a34a",
-      color: "#fff",
-      fontWeight: 700,
-      cursor: "pointer",
-    }}
-  >
-    ✅ Mark item as given
-  </button>
-)}
+              {req.status === "approved" && req.owner_visible && requester && (
+                <div
+                  style={{
+                    marginTop: 14,
+                    background: "#ecfdf5",
+                    padding: 14,
+                    borderRadius: 12,
+                    color: "#065f46",
+                  }}
+                >
+                  <p style={{ margin: 0, fontWeight: 600 }}>
+                    Request approved
+                  </p>
 
+                  <p style={{ marginTop: 6, fontSize: 14 }}>
+                    <strong>Requester:</strong> {requester.name}
+                    <br />
+                    <strong>Phone:</strong> {requester.phone}
+                  </p>
 
-                
-                    {item.is_completed && (
-                      <p style={{ marginTop: 12, fontSize: 14 }}>
-                        ✅ Item completed — points awarded
-                      </p>
-                    )}
-                  </div>
-                )}
+                  {req.owner_confirmed !== true && (
+                    <button
+                      onClick={() => confirmOwnerGiven(req.id)}
+                      style={{
+                        marginTop: 12,
+                        width: "100%",
+                        padding: "12px",
+                        borderRadius: 12,
+                        border: "none",
+                        background: "#16a34a",
+                        color: "#fff",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      ✅ Mark item as given
+                    </button>
+                  )}
+
+                  {item.is_completed && (
+                    <p style={{ marginTop: 12, fontSize: 14 }}>
+                      ✅ Item completed — points awarded
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}

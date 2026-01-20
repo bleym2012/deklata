@@ -11,6 +11,11 @@ export default function MyRequestsPage() {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+   
+  const [ownerProfiles, setOwnerProfiles] = useState<Record<string, any>>({})
+
+
+
 
   useEffect(() => {
     loadMyRequests();
@@ -24,7 +29,6 @@ export default function MyRequestsPage() {
       data: { user },
     } = await supabase.auth.getUser();
 
-    // 🔐 Redirect if not logged in
     if (!user) {
       router.push("/login");
       return;
@@ -32,9 +36,18 @@ export default function MyRequestsPage() {
 
     const { data, error } = await supabase
       .from("requests")
-      .select(
-        "id, status, requester_visible, requester_confirmed, items(id, name, owner_id)"
+      .select(`
+        id,
+        status,
+        requester_visible,
+        requester_confirmed,
+        items (
+          id,
+          name,
+          owner_id
+         
       )
+      `)
       .eq("requester_id", user.id)
       .eq("status", "approved")
       .order("created_at", { ascending: false });
@@ -46,20 +59,47 @@ export default function MyRequestsPage() {
     }
 
     setRequests((data || []).filter((r) => r.items !== null));
+    const ownerIds = Array.from(
+      new Set(
+        (data || [])
+        .filter((r) => r.items !== null)
+        .map((r: any) => r.items.owner_id as string)
+      )
+    );
+
+    if (ownerIds.length > 0) {
+      const { data: owners } = await supabase
+          .from("profiles")
+          .select("id, name, phone") 
+          .in("id", ownerIds);
+        
+      const map: Record<string, any> = {};
+      owners?.forEach(o => {
+        map[o.id] = o;
+      });
+
+      setOwnerProfiles(map);
+    }
+
+
+
+
     setLoading(false);
   }
 
   async function confirmReceived(requestId: string) {
-    const { error } = await supabase.rpc("confirm_requester_received", {
-      p_request_id: requestId,
-    });
+    const { error } = await supabase.rpc(
+      "confirm_requester_received",
+      {
+        p_request_id: requestId,
+      }
+    );
 
     if (error) {
       alert(error.message);
       return;
     }
 
-    // 🔁 Refresh UI after confirmation
     loadMyRequests();
   }
 
@@ -72,7 +112,6 @@ export default function MyRequestsPage() {
         fontFamily: "system-ui, -apple-system, BlinkMacSystemFont",
       }}
     >
-      {/* 🔙 Back */}
       <Link
         href="/"
         style={{
@@ -102,96 +141,84 @@ export default function MyRequestsPage() {
       )}
 
       <div style={{ display: "grid", gap: 16 }}>
-        {requests.map((req) => (
-          <div
-            key={req.id}
-            style={{
-              background: "#fff",
-              borderRadius: 16,
-              padding: 20,
-              boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
-            }}
-          >
-            <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 10 }}>
-              {req.items.name}
-            </h3>
+        {requests.map((req) => {
+          const owner = req.profiles; // 🔧 FIX: inline owner profile
 
-            {/* Owner contact visible */}
-            {req.requester_visible && (
-              <OwnerContact ownerId={req.items.owner_id} />
-            )}
+          return (
+            <div
+              key={req.id}
+              style={{
+                background: "#fff",
+                borderRadius: 16,
+                padding: 20,
+                boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+              }}
+            >
+              <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 10 }}>
+                {req.items.name}
+              </h3>
 
-            {/* Requester confirmation */}
-            {!req.requester_confirmed ? (
-              <button
-                onClick={() => confirmReceived(req.id)}
-                style={{
-                  marginTop: 14,
-                  width: "100%",
-                  padding: "14px",
-                  background: "#16a34a",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: 14,
-                  fontSize: 16,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                ✓ Mark item as picked up
-              </button>
-            ) : (
-              <div
-                style={{
-                  marginTop: 14,
-                  background: "#ecfdf5",
-                  padding: 14,
-                  borderRadius: 12,
-                  color: "#065f46",
-                  fontWeight: 600,
-                  textAlign: "center",
-                }}
-              >
-                ✔ You confirmed receipt
-              </div>
-            )}
-          </div>
-        ))}
+              {/* OWNER CONTACT */}
+              {req.requester_visible && ownerProfiles[req.items.owner_id] && (
+                <div
+                  style={{
+                    background: "#ecfdf5",
+                    padding: 14,
+                    borderRadius: 12,
+                    color: "#065f46",
+                    fontSize: 14,
+                    marginTop: 10,
+                  }}
+                >
+                  <p style={{ margin: 0, fontWeight: 600 }}>Owner contact</p>
+                  <p style={{ marginTop: 6 }}>
+                    <strong>Name:</strong>{" "} 
+                    {ownerProfiles[req.items.owner_id].name}
+                    <br />
+                    <strong>Phone:</strong>{" "} 
+                    {ownerProfiles[req.items.owner_id].phone}
+                  </p>
+                </div>
+              )}
+
+              {/* CONFIRM RECEIVED */}
+              {!req.requester_confirmed ? (
+                <button
+                  onClick={() => confirmReceived(req.id)}
+                  style={{
+                    marginTop: 14,
+                    width: "100%",
+                    padding: "14px",
+                    background: "#16a34a",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 14,
+                    fontSize: 16,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  ✓ Mark item as picked up
+                </button>
+              ) : (
+                <div
+                  style={{
+                    marginTop: 14,
+                    background: "#ecfdf5",
+                    padding: 14,
+                    borderRadius: 12,
+                    color: "#065f46",
+                    fontWeight: 600,
+                    textAlign: "center",
+                  }}
+                >
+                  ✔ You confirmed receipt
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </main>
-  );
-}
-
-function OwnerContact({ ownerId }: { ownerId: string }) {
-  const [profile, setProfile] = useState<any>(null);
-
-  useEffect(() => {
-    supabase
-      .from("profiles")
-      .select("name, phone")
-      .eq("id", ownerId)
-      .single()
-      .then(({ data }) => setProfile(data));
-  }, [ownerId]);
-
-  if (!profile) return null;
-
-  return (
-    <div
-      style={{
-        background: "#ecfdf5",
-        padding: 14,
-        borderRadius: 12,
-        color: "#065f46",
-        fontSize: 14,
-      }}
-    >
-      <p style={{ margin: 0, fontWeight: 600 }}>Owner contact</p>
-      <p style={{ marginTop: 6 }}>
-        <strong>Name:</strong> {profile.name}
-        <br />
-        <strong>Phone:</strong> {profile.phone}
-      </p>
-    </div>
   );
 }

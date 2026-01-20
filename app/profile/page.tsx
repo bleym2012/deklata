@@ -19,6 +19,10 @@ export default function ProfilePage() {
     loadProfile();
   }, []);
 
+
+
+
+
   async function loadProfile() {
     setLoading(true);
 
@@ -39,20 +43,41 @@ export default function ProfilePage() {
       .eq("id", user.id)
       .single();
 
+    // 🔧 AUTO-FIX missing profile fields (safe + one-time)
+    if (profileData && (!profileData.name || !profileData.campus)) {
+      const updates: any = {};
+
+      if (!profileData.name) {
+        updates.name = user.email?.split("@")[0];
+      }
+
+      if (!profileData.campus) {
+        updates.campus = "Not specified";
+      }
+
+      await supabase
+        .from("profiles")
+        .update(updates)
+        .eq("id", user.id);
+
+      setProfile({ ...profileData, ...updates });
+    } else {
+      setProfile(profileData);
+    }
+
     const { data: pointsData } = await supabase
       .from("user_points")
       .select("points_total")
       .eq("user_id", user.id)
       .single();
 
-    setProfile(profileData);
     setPoints(pointsData?.points_total ?? 0);
     setLoading(false);
   }
 
   function getTier(points: number) {
     if (points >= 500) return "Gold Giver 🥇";
-    if (points >= 200) return "Silver Giver 🥈";
+    if (points >= 250) return "Silver Giver 🥈";
     if (points >= 50) return "Bronze Giver 🥉";
     return "New Giver 🌱";
   }

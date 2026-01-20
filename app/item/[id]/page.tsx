@@ -23,7 +23,6 @@ export default function ItemDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [requesting, setRequesting] = useState(false);
 
-  /* ✅ NEW: active image index */
   const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
@@ -42,7 +41,10 @@ export default function ItemDetailsPage() {
 
     const { data: itemData } = await supabase
       .from("items")
-      .select("*")
+      .select(`
+        *,
+        categories ( id, name )   -- 🔧 FIX #1: JOIN categories
+      `)
       .eq("id", id)
       .single();
 
@@ -107,7 +109,6 @@ export default function ItemDetailsPage() {
         fontFamily: "system-ui, -apple-system, BlinkMacSystemFont",
       }}
     >
-      {/* 🔙 BACK */}
       <button
         onClick={() => router.push(backUrl)}
         style={{
@@ -122,7 +123,6 @@ export default function ItemDetailsPage() {
         ← Back to results
       </button>
 
-      {/* 🔁 RESPONSIVE LAYOUT */}
       <div
         style={{
           display: "flex",
@@ -130,7 +130,6 @@ export default function ItemDetailsPage() {
           gap: 32,
         }}
       >
-        {/* 🖼 IMAGE CAROUSEL */}
         <div>
           <div
             onScroll={(e) => {
@@ -165,7 +164,6 @@ export default function ItemDetailsPage() {
             ))}
           </div>
 
-          {/* ✅ IMAGE COUNT */}
           {images.length > 1 && (
             <div
               style={{
@@ -181,7 +179,6 @@ export default function ItemDetailsPage() {
           )}
         </div>
 
-        {/* 📄 DETAILS */}
         <div>
           <h1 style={{ fontSize: 30, fontWeight: 700, marginBottom: 10 }}>
             {item.name}
@@ -207,7 +204,8 @@ export default function ItemDetailsPage() {
             }}
           >
             <p style={{ margin: 0 }}>
-              <strong>Category:</strong> {item.category}
+              <strong>Category:</strong>{" "}
+              {item.categories?.name || "Uncategorized"}  {/* 🔧 FIX #2 */}
             </p>
             <p style={{ marginTop: 6 }}>
               <strong>Pickup location:</strong> {item.pickup_location}
@@ -291,7 +289,6 @@ export default function ItemDetailsPage() {
         </div>
       </div>
 
-      {/* 🖥 DESKTOP ENHANCEMENT */}
       <style jsx>{`
         @media (min-width: 1024px) {
           main > div {

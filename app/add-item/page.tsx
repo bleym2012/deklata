@@ -15,6 +15,7 @@ export default function AddItemPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [categoryName, setCategoryName] = useState("");
   const [pickupLocation, setPickupLocation] = useState("");
 
   const [categories, setCategories] = useState<Category[]>([]);
@@ -100,6 +101,7 @@ export default function AddItemPage() {
         name,
         description,
         category_id: categoryId,
+        category_name: categoryName,
         pickup_location: pickupLocation,
       })
       .select()
@@ -168,7 +170,14 @@ export default function AddItemPage() {
         {/* CATEGORY — DATABASE DRIVEN */}
         <select
           value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
+          onChange={(e) => {
+             const selectedId = e.target.value;
+             setCategoryId(selectedId);
+
+             const selectedOption =
+            e.target.options[e.target.selectedIndex];
+              setCategoryName(selectedOption.text);
+          }}
           required
           style={inputStyle}
         >
