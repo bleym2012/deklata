@@ -18,8 +18,19 @@ export default function RegisterPage() {
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
+
+
     setLoading(true);
     setError(null);
+    
+  
+
+     console.log("REGISTER VALUES:", {
+      name,
+      phone,
+      campus,
+      email,
+    });
 
     const { data, error: signUpError } = await supabase.auth.signUp({
       email,
@@ -32,18 +43,22 @@ export default function RegisterPage() {
       return;
     }
 
-    const { error: profileError } = await supabase.from("profiles").insert({
-      id: data.user.id,
-      name,
-      phone,
-      campus,
-    });
+    const { error: updateError } = await supabase
+       .from("profiles")
+       .update({
+         name,
+         phone,
+         campus,
+       })
+       .eq("id", data.user.id);
 
-    if (profileError) {
-      setError(profileError.message);
-      setLoading(false);
+    if (updateError) {
+      setError(updateError.message);
       return;
     }
+
+
+
 
     router.push("/");
   }
