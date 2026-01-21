@@ -224,7 +224,7 @@ export default function ItemDetailsPage() {
                 textAlign: "center",
               }}
             >
-              🚫 This item has already been requested
+              🚫 You have requested for this item
             </div>
           )}
 
