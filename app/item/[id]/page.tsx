@@ -118,12 +118,12 @@ export default function ItemDetailsPage() {
       if (itemData) {
         const { data: ownerProfile, error: ownerErr } = await supabase
           .from("profiles")
-          .select("email, full_name")
+          .select("email, name")
           .eq("id", itemData.owner_id)
           .single();
         const { data: requesterProfile, error: reqErr } = await supabase
           .from("profiles")
-          .select("email, full_name")
+          .select("email, name")
           .eq("id", userId)
           .single();
         const {
