@@ -101,6 +101,12 @@ export default function ItemDetailsPage() {
       p_item_id: id,
       p_user_id: userId,
     });
+    console.log(
+      "[EMAIL] RPC request_item returned data:",
+      data,
+      "error:",
+      error,
+    );
     if (error) {
       console.error("X request_item RPC failed:", error);
       alert(error.message);
@@ -143,6 +149,7 @@ export default function ItemDetailsPage() {
         );
         console.log("[EMAIL] session token present:", !!session?.access_token);
         if (ownerProfile && requesterProfile && session?.access_token) {
+          console.log("[EMAIL] Sending to edge function — request_id:", data);
           const res = await fetch(
             "https://iibknadykycghvbjbwxs.supabase.co/functions/v1/notify-owner-request",
             {
