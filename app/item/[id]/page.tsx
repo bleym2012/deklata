@@ -101,12 +101,6 @@ export default function ItemDetailsPage() {
       p_item_id: id,
       p_user_id: userId,
     });
-    console.log(
-      "[EMAIL] RPC request_item returned data:",
-      data,
-      "error:",
-      error,
-    );
     if (error) {
       console.error("X request_item RPC failed:", error);
       alert(error.message);
@@ -115,19 +109,29 @@ export default function ItemDetailsPage() {
     }
 
     try {
-      const { data: itemData, error: itemErr } = await supabase
+      // Fetch the request ID directly — RPC returns null so we query it ourselves
+      const { data: requestRow } = await supabase
+        .from("requests")
+        .select("id")
+        .eq("item_id", id)
+        .eq("requester_id", userId)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      const { data: itemData } = await supabase
         .from("items")
         .select("name, owner_id")
         .eq("id", id)
         .single();
-      console.log("[EMAIL] itemData:", itemData, "itemErr:", itemErr);
-      if (itemData) {
-        const { data: ownerProfile, error: ownerErr } = await supabase
+      if (itemData && requestRow?.id) {
+        const { data: ownerProfile } = await supabase
           .from("profiles")
           .select("email, name")
           .eq("id", itemData.owner_id)
           .single();
-        const { data: requesterProfile, error: reqErr } = await supabase
+        const { data: requesterProfile } = await supabase
           .from("profiles")
           .select("email, name")
           .eq("id", userId)
@@ -135,22 +139,8 @@ export default function ItemDetailsPage() {
         const {
           data: { session },
         } = await supabase.auth.getSession();
-        console.log(
-          "[EMAIL] ownerProfile:",
-          ownerProfile,
-          "ownerErr:",
-          ownerErr,
-        );
-        console.log(
-          "[EMAIL] requesterProfile:",
-          requesterProfile,
-          "reqErr:",
-          reqErr,
-        );
-        console.log("[EMAIL] session token present:", !!session?.access_token);
         if (ownerProfile && requesterProfile && session?.access_token) {
-          console.log("[EMAIL] Sending to edge function — request_id:", data);
-          const res = await fetch(
+          await fetch(
             "https://iibknadykycghvbjbwxs.supabase.co/functions/v1/notify-owner-request",
             {
               method: "POST",
@@ -158,24 +148,16 @@ export default function ItemDetailsPage() {
                 "Content-Type": "application/json",
                 Authorization: "Bearer " + session.access_token,
               },
-              body: JSON.stringify({ type: "new_request", request_id: data }),
+              body: JSON.stringify({
+                type: "new_request",
+                request_id: requestRow.id,
+              }),
             },
-          );
-          const resText = await res.text();
-          console.log("[EMAIL] Edge function response:", res.status, resText);
-        } else {
-          console.warn(
-            "[EMAIL] Guard failed — ownerProfile:",
-            !!ownerProfile,
-            "requesterProfile:",
-            !!requesterProfile,
-            "token:",
-            !!session?.access_token,
           );
         }
       }
     } catch (emailError) {
-      console.error("[EMAIL] Notification failed:", emailError);
+      console.error("Email notification failed:", emailError);
     }
 
     await loadItem();
