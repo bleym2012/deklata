@@ -19,12 +19,21 @@ export default function OwnerDashboard() {
   const [authChecking, setAuthChecking] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
 
-  useEffect(() => { checkAuth(); }, []);
-  useEffect(() => { if (userId && tab === "myitems") loadMyItems(); }, [tab, userId]);
+  useEffect(() => {
+    checkAuth();
+  }, []);
+  useEffect(() => {
+    if (userId && tab === "myitems") loadMyItems();
+  }, [tab, userId]);
 
   async function checkAuth() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.push("/login"); return; }
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      router.push("/login");
+      return;
+    }
     setUserId(user.id);
     setAuthChecking(false);
     loadRequests(user.id);
@@ -34,7 +43,9 @@ export default function OwnerDashboard() {
     setItemsLoading(true);
     const { data, error } = await supabase
       .from("items")
-      .select("id, name, status, is_locked, is_completed, created_at, category_id, categories(name)")
+      .select(
+        "id, name, status, is_locked, is_completed, created_at, category_id, categories(name)",
+      )
       .eq("owner_id", userId)
       .order("created_at", { ascending: false });
     if (!error) setMyItems(data || []);
@@ -43,22 +54,36 @@ export default function OwnerDashboard() {
 
   async function deleteMyItem(itemId: string, isLocked: boolean) {
     if (isLocked) {
-      alert("This item has an active request. Reject it first before deleting.");
+      alert(
+        "This item has an active request. Reject it first before deleting.",
+      );
       return;
     }
     if (!confirm("Delete this item permanently?")) return;
     // Reject any pending requests first
-    await supabase.from("requests").update({ status: "rejected" }).eq("item_id", itemId);
+    await supabase
+      .from("requests")
+      .update({ status: "rejected" })
+      .eq("item_id", itemId);
     await supabase.from("item_images").delete().eq("item_id", itemId);
     const { error } = await supabase.from("items").delete().eq("id", itemId);
-    if (error) { alert(error.message); return; }
-    setMyItems(prev => prev.filter(i => i.id !== itemId));
+    if (error) {
+      alert(error.message);
+      return;
+    }
+    setMyItems((prev) => prev.filter((i) => i.id !== itemId));
   }
 
   async function confirmOwnerGiven(requestId: string) {
     setCompletingId(requestId);
-    const { error } = await supabase.rpc("confirm_owner_given", { p_request_id: requestId });
-    if (error) { alert(error.message); setCompletingId(null); return; }
+    const { error } = await supabase.rpc("confirm_owner_given", {
+      p_request_id: requestId,
+    });
+    if (error) {
+      alert(error.message);
+      setCompletingId(null);
+      return;
+    }
     setCompletingId(null);
     loadRequests(userId!);
   }
@@ -68,16 +93,22 @@ export default function OwnerDashboard() {
     setError("");
     const { data, error } = await supabase
       .from("requests")
-      .select(`
+      .select(
+        `
         id, status, requester_id, owner_visible, owner_confirmed,
         requester_confirmed, item_id, created_at,
         items ( id, name, owner_id, is_locked, is_completed )
-      `)
+      `,
+      )
       .eq("items.owner_id", uid)
       .in("status", ["pending", "approved"])
       .order("created_at", { ascending: false });
 
-    if (error) { setError(error.message); setLoading(false); return; }
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+      return;
+    }
 
     const safe = (data || []).filter((r) => r.items !== null);
     setRequests(safe);
@@ -90,7 +121,9 @@ export default function OwnerDashboard() {
         .select("id, name, phone, campus")
         .in("id", allRequesterIds);
       const map: Record<string, any> = {};
-      profs?.forEach((p) => { map[p.id] = p; });
+      profs?.forEach((p) => {
+        map[p.id] = p;
+      });
       setProfiles(map);
     }
 
@@ -100,14 +133,24 @@ export default function OwnerDashboard() {
   async function approveRequest(requestId: string, itemId: string) {
     try {
       setApprovingId(requestId);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { alert("Not authenticated"); return; }
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        alert("Not authenticated");
+        return;
+      }
 
-      // Check item is still available (not already locked by another approval)
-      const { data: itemCheck } = await supabase
-        .from("items").select("is_locked").eq("id", itemId).single();
-      if (itemCheck?.is_locked) {
-        alert("This item is already locked by another approved request.");
+      // Check there is no OTHER approved request for this item already
+      const { data: existingApproval } = await supabase
+        .from("requests")
+        .select("id")
+        .eq("item_id", itemId)
+        .eq("status", "approved")
+        .neq("id", requestId)
+        .maybeSingle();
+      if (existingApproval) {
+        alert("This item already has an approved request.");
         await loadRequests(user.id);
         return;
       }
@@ -123,32 +166,51 @@ export default function OwnerDashboard() {
           approved_at: new Date().toISOString(),
         })
         .eq("id", requestId);
-      if (requestError) { alert(requestError.message); return; }
+      if (requestError) {
+        alert(requestError.message);
+        return;
+      }
 
       const { error: itemError } = await supabase
         .from("items")
         .update({ is_locked: true, is_completed: false })
         .eq("id", itemId);
-      if (itemError) { alert(itemError.message); return; }
+      if (itemError) {
+        alert(itemError.message);
+        return;
+      }
 
       // Send approval email notification
       try {
         const { data: requestData } = await supabase
-          .from("requests").select("requester_id, item_id").eq("id", requestId).single();
+          .from("requests")
+          .select("requester_id, item_id")
+          .eq("id", requestId)
+          .single();
         if (requestData) {
-          const { data: { session } } = await supabase.auth.getSession();
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
           if (session?.access_token) {
-            await fetch("https://iibknadykycghvbjbwxs.supabase.co/functions/v1/notify-owner-request", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${session.access_token}`,
+            await fetch(
+              "https://iibknadykycghvbjbwxs.supabase.co/functions/v1/notify-owner-request",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({
+                  type: "approved",
+                  request_id: requestId,
+                }),
               },
-              body: JSON.stringify({ type: "approved", request_id: requestId }),
-            });
+            );
           }
         }
-      } catch (emailError) { console.error("Approval email failed:", emailError); }
+      } catch (emailError) {
+        console.error("Approval email failed:", emailError);
+      }
 
       loadRequests(user.id);
     } finally {
@@ -158,27 +220,58 @@ export default function OwnerDashboard() {
 
   async function rejectRequest(requestId: string, itemId: string) {
     const { error: deleteError } = await supabase
-      .from("requests").delete().eq("id", requestId);
+      .from("requests")
+      .delete()
+      .eq("id", requestId);
     if (deleteError) {
-      await supabase.from("requests").update({ status: "rejected" }).eq("id", requestId);
+      await supabase
+        .from("requests")
+        .update({ status: "rejected" })
+        .eq("id", requestId);
     }
-    await supabase.from("items")
-      .update({ is_locked: false, status: "available" }).eq("id", itemId);
+    await supabase
+      .from("items")
+      .update({ is_locked: false, status: "available" })
+      .eq("id", itemId);
     loadRequests(userId!);
   }
 
   if (authChecking) return null;
 
-  const pendingCount = requests.filter(r => r.status === "pending").length;
-  const approvedCount = requests.filter(r => r.status === "approved").length;
+  const pendingCount = requests.filter((r) => r.status === "pending").length;
+  const approvedCount = requests.filter((r) => r.status === "approved").length;
 
   return (
-    <main style={{ maxWidth: 900, margin: "0 auto", padding: "32px 20px", fontFamily: "var(--font-body)" }}>
-      <Link href="/" style={{ display: "inline-block", marginBottom: 20, fontSize: 14, color: "var(--green-700)", fontWeight: 600, textDecoration: "none" }}>
+    <main
+      style={{
+        maxWidth: 900,
+        margin: "0 auto",
+        padding: "32px 20px",
+        fontFamily: "var(--font-body)",
+      }}
+    >
+      <Link
+        href="/"
+        style={{
+          display: "inline-block",
+          marginBottom: 20,
+          fontSize: 14,
+          color: "var(--green-700)",
+          fontWeight: 600,
+          textDecoration: "none",
+        }}
+      >
         ← Back to Home
       </Link>
 
-      <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 6, fontFamily: "var(--font-display)" }}>
+      <h1
+        style={{
+          fontSize: 28,
+          fontWeight: 800,
+          marginBottom: 6,
+          fontFamily: "var(--font-display)",
+        }}
+      >
         My Dashboard
       </h1>
       <p style={{ color: "var(--ink-500)", marginBottom: 28, fontSize: 14 }}>
@@ -186,18 +279,44 @@ export default function OwnerDashboard() {
       </p>
 
       {/* TABS */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 28, borderBottom: "2px solid var(--ink-100)", paddingBottom: 0 }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          marginBottom: 28,
+          borderBottom: "2px solid var(--ink-100)",
+          paddingBottom: 0,
+        }}
+      >
         {[
-          { key: "requests", label: `Requests${pendingCount > 0 ? ` (${pendingCount} new)` : ""}` },
-          { key: "myitems", label: `My Items${myItems.length > 0 ? ` (${myItems.length})` : ""}` },
-        ].map(t => (
-          <button key={t.key} onClick={() => setTab(t.key as any)} style={{
-            padding: "10px 20px", border: "none", background: "none", cursor: "pointer",
-            fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 14,
-            color: tab === t.key ? "var(--green-800)" : "var(--ink-400)",
-            borderBottom: `3px solid ${tab === t.key ? "var(--green-800)" : "transparent"}`,
-            marginBottom: -2, transition: "all 0.15s",
-          }}>{t.label}</button>
+          {
+            key: "requests",
+            label: `Requests${pendingCount > 0 ? ` (${pendingCount} new)` : ""}`,
+          },
+          {
+            key: "myitems",
+            label: `My Items${myItems.length > 0 ? ` (${myItems.length})` : ""}`,
+          },
+        ].map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key as any)}
+            style={{
+              padding: "10px 20px",
+              border: "none",
+              background: "none",
+              cursor: "pointer",
+              fontFamily: "var(--font-display)",
+              fontWeight: 700,
+              fontSize: 14,
+              color: tab === t.key ? "var(--green-800)" : "var(--ink-400)",
+              borderBottom: `3px solid ${tab === t.key ? "var(--green-800)" : "transparent"}`,
+              marginBottom: -2,
+              transition: "all 0.15s",
+            }}
+          >
+            {t.label}
+          </button>
         ))}
       </div>
 
@@ -209,76 +328,165 @@ export default function OwnerDashboard() {
           {loading ? (
             <div style={{ display: "grid", gap: 16 }}>
               {[...Array(3)].map((_, i) => (
-                <div key={i} className="skeleton" style={{ height: 140, borderRadius: 16 }} />
+                <div
+                  key={i}
+                  className="skeleton"
+                  style={{ height: 140, borderRadius: 16 }}
+                />
               ))}
             </div>
           ) : requests.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "48px 24px", color: "var(--ink-400)" }}>
+            <div
+              style={{
+                textAlign: "center",
+                padding: "48px 24px",
+                color: "var(--ink-400)",
+              }}
+            >
               <div style={{ fontSize: 40, marginBottom: 12 }}>📭</div>
-              <p style={{ fontWeight: 600, fontSize: 16, color: "var(--ink-700)" }}>No requests yet</p>
-              <p style={{ fontSize: 14, marginTop: 6 }}>When students request your items, they'll appear here.</p>
-              <Link href="/add-item" style={{
-                display: "inline-block", marginTop: 20,
-                background: "var(--green-800)", color: "#fff",
-                padding: "10px 24px", borderRadius: 999,
-                fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 14,
-              }}>+ Post an item</Link>
+              <p
+                style={{
+                  fontWeight: 600,
+                  fontSize: 16,
+                  color: "var(--ink-700)",
+                }}
+              >
+                No requests yet
+              </p>
+              <p style={{ fontSize: 14, marginTop: 6 }}>
+                When students request your items, they'll appear here.
+              </p>
+              <Link
+                href="/add-item"
+                style={{
+                  display: "inline-block",
+                  marginTop: 20,
+                  background: "var(--green-800)",
+                  color: "#fff",
+                  padding: "10px 24px",
+                  borderRadius: 999,
+                  fontFamily: "var(--font-display)",
+                  fontWeight: 700,
+                  fontSize: 14,
+                }}
+              >
+                + Post an item
+              </Link>
             </div>
           ) : (
             <div style={{ display: "grid", gap: 16 }}>
               {requests.map((req) => {
                 const item = req.items;
                 const requesterProfile = profiles[req.requester_id];
-                const firstName = requesterProfile?.name?.split(" ")[0] || "A student";
+                const firstName =
+                  requesterProfile?.name?.split(" ")[0] || "A student";
                 const requesterCampus = requesterProfile?.campus || "";
 
                 return (
-                  <div key={req.id} style={{
-                    background: "var(--white)", borderRadius: 16, padding: 20,
-                    boxShadow: "var(--shadow-card)", border: "1px solid var(--ink-100)",
-                    borderLeft: req.status === "pending" ? "4px solid var(--gold)" : "4px solid var(--green-600)",
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                      <h3 style={{ fontSize: 17, fontWeight: 700, fontFamily: "var(--font-display)", color: "var(--ink-900)" }}>
+                  <div
+                    key={req.id}
+                    style={{
+                      background: "var(--white)",
+                      borderRadius: 16,
+                      padding: 20,
+                      boxShadow: "var(--shadow-card)",
+                      border: "1px solid var(--ink-100)",
+                      borderLeft:
+                        req.status === "pending"
+                          ? "4px solid var(--gold)"
+                          : "4px solid var(--green-600)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                        marginBottom: 10,
+                      }}
+                    >
+                      <h3
+                        style={{
+                          fontSize: 17,
+                          fontWeight: 700,
+                          fontFamily: "var(--font-display)",
+                          color: "var(--ink-900)",
+                        }}
+                      >
                         {item.name}
                       </h3>
-                      <span style={{
-                        padding: "3px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700,
-                        background: req.status === "pending" ? "#fef3c7" : "#dcfce7",
-                        color: req.status === "pending" ? "#92400e" : "#166534",
-                        fontFamily: "var(--font-display)",
-                      }}>
+                      <span
+                        style={{
+                          padding: "3px 10px",
+                          borderRadius: 999,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          background:
+                            req.status === "pending" ? "#fef3c7" : "#dcfce7",
+                          color:
+                            req.status === "pending" ? "#92400e" : "#166534",
+                          fontFamily: "var(--font-display)",
+                        }}
+                      >
                         {req.status === "pending" ? "PENDING" : "APPROVED"}
                       </span>
                     </div>
 
                     {req.status === "pending" && (
                       <>
-                        <p style={{ fontSize: 14, color: "var(--ink-500)", marginBottom: 14 }}>
-                          <strong style={{ color: "var(--ink-700)" }}>{firstName}</strong>
-                          {requesterCampus && <span style={{ color: "var(--ink-400)" }}> · {requesterCampus}</span>}
-                          {" "}wants this item.
+                        <p
+                          style={{
+                            fontSize: 14,
+                            color: "var(--ink-500)",
+                            marginBottom: 14,
+                          }}
+                        >
+                          <strong style={{ color: "var(--ink-700)" }}>
+                            {firstName}
+                          </strong>
+                          {requesterCampus && (
+                            <span style={{ color: "var(--ink-400)" }}>
+                              {" "}
+                              · {requesterCampus}
+                            </span>
+                          )}{" "}
+                          wants this item.
                         </p>
                         <div style={{ display: "flex", gap: 10 }}>
                           <button
                             onClick={() => approveRequest(req.id, req.item_id)}
                             disabled={approvingId === req.id}
                             style={{
-                              flex: 1, padding: "11px", borderRadius: 12, border: "none",
-                              background: "var(--green-800)", color: "#fff", fontWeight: 700,
-                              cursor: "pointer", fontFamily: "var(--font-display)", fontSize: 14,
+                              flex: 1,
+                              padding: "11px",
+                              borderRadius: 12,
+                              border: "none",
+                              background: "var(--green-800)",
+                              color: "#fff",
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              fontFamily: "var(--font-display)",
+                              fontSize: 14,
                               opacity: approvingId === req.id ? 0.7 : 1,
                             }}
                           >
-                            {approvingId === req.id ? "Approving…" : "✓ Approve"}
+                            {approvingId === req.id
+                              ? "Approving…"
+                              : "✓ Approve"}
                           </button>
                           <button
                             onClick={() => rejectRequest(req.id, req.item_id)}
                             style={{
-                              flex: 1, padding: "11px", borderRadius: 12,
-                              border: "1.5px solid #dc2626", background: "#fff",
-                              color: "#dc2626", fontWeight: 700, cursor: "pointer",
-                              fontFamily: "var(--font-display)", fontSize: 14,
+                              flex: 1,
+                              padding: "11px",
+                              borderRadius: 12,
+                              border: "1.5px solid #dc2626",
+                              background: "#fff",
+                              color: "#dc2626",
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              fontFamily: "var(--font-display)",
+                              fontSize: 14,
                             }}
                           >
                             Decline
@@ -287,43 +495,93 @@ export default function OwnerDashboard() {
                       </>
                     )}
 
-                    {req.status === "approved" && req.owner_visible && profiles[req.requester_id] && (
-                      <div style={{ background: "var(--green-50)", padding: 16, borderRadius: 12, border: "1px solid var(--green-100)" }}>
-                        <p style={{ margin: 0, fontWeight: 700, color: "var(--green-800)", marginBottom: 8 }}>
-                          ✅ Request approved — contact details below
-                        </p>
-                        <p style={{ fontSize: 14, color: "var(--ink-700)", margin: 0 }}>
-                          <strong>Name:</strong> {profiles[req.requester_id].name}<br />
-                          <strong>Phone:</strong> {profiles[req.requester_id].phone || "Not provided"}<br />
-                          <strong>Campus:</strong> {profiles[req.requester_id].campus || "—"}
-                        </p>
-                        {req.owner_confirmed !== true ? (
-                          <button
-                            onClick={() => confirmOwnerGiven(req.id)}
-                            disabled={completingId === req.id}
+                    {req.status === "approved" &&
+                      req.owner_visible &&
+                      profiles[req.requester_id] && (
+                        <div
+                          style={{
+                            background: "var(--green-50)",
+                            padding: 16,
+                            borderRadius: 12,
+                            border: "1px solid var(--green-100)",
+                          }}
+                        >
+                          <p
                             style={{
-                              marginTop: 14, width: "100%", padding: "12px",
-                              borderRadius: 12, border: "none",
-                              background: "var(--green-800)", color: "#fff",
-                              fontWeight: 700, cursor: "pointer",
-                              fontFamily: "var(--font-display)", fontSize: 14,
-                              opacity: completingId === req.id ? 0.7 : 1,
+                              margin: 0,
+                              fontWeight: 700,
+                              color: "var(--green-800)",
+                              marginBottom: 8,
                             }}
                           >
-                            {completingId === req.id ? "Confirming…" : "✅ Mark item as given"}
-                          </button>
-                        ) : (
-                          <p style={{ marginTop: 12, fontSize: 14, color: "var(--green-700)", fontWeight: 600 }}>
-                            ✅ You've confirmed giving this item. Waiting for receiver confirmation.
+                            ✅ Request approved — contact details below
                           </p>
-                        )}
-                        {item.is_completed && (
-                          <p style={{ marginTop: 8, fontSize: 13, color: "var(--green-700)", fontWeight: 600 }}>
-                            🎉 Exchange complete — points awarded!
+                          <p
+                            style={{
+                              fontSize: 14,
+                              color: "var(--ink-700)",
+                              margin: 0,
+                            }}
+                          >
+                            <strong>Name:</strong>{" "}
+                            {profiles[req.requester_id].name}
+                            <br />
+                            <strong>Phone:</strong>{" "}
+                            {profiles[req.requester_id].phone || "Not provided"}
+                            <br />
+                            <strong>Campus:</strong>{" "}
+                            {profiles[req.requester_id].campus || "—"}
                           </p>
-                        )}
-                      </div>
-                    )}
+                          {req.owner_confirmed !== true ? (
+                            <button
+                              onClick={() => confirmOwnerGiven(req.id)}
+                              disabled={completingId === req.id}
+                              style={{
+                                marginTop: 14,
+                                width: "100%",
+                                padding: "12px",
+                                borderRadius: 12,
+                                border: "none",
+                                background: "var(--green-800)",
+                                color: "#fff",
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                fontFamily: "var(--font-display)",
+                                fontSize: 14,
+                                opacity: completingId === req.id ? 0.7 : 1,
+                              }}
+                            >
+                              {completingId === req.id
+                                ? "Confirming…"
+                                : "✅ Mark item as given"}
+                            </button>
+                          ) : (
+                            <p
+                              style={{
+                                marginTop: 12,
+                                fontSize: 14,
+                                color: "var(--green-700)",
+                                fontWeight: 600,
+                              }}
+                            >
+                              ✅ You've confirmed giving this item. Waiting for
+                              receiver confirmation.
+                            </p>
+                          )}
+                          {item.is_completed && (
+                            <p
+                              style={{
+                                marginTop: 8,
+                                fontSize: 13,
+                                color: "var(--green-700)",
+                                fontWeight: 600,
+                              }}
+                            >
+                              🎉 Exchange complete — points awarded!
+                            </p>
+                          )}
+                        </div>
+                      )}
                   </div>
                 );
               })}
@@ -335,61 +593,168 @@ export default function OwnerDashboard() {
       {/* ── MY ITEMS TAB ── */}
       {tab === "myitems" && (
         <>
-          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
-            <Link href="/add-item" style={{
-              background: "var(--gold)", color: "#fff", padding: "10px 22px",
-              borderRadius: 999, fontFamily: "var(--font-display)", fontWeight: 700,
-              fontSize: 13, textDecoration: "none",
-            }}>+ Add new item</Link>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              marginBottom: 16,
+            }}
+          >
+            <Link
+              href="/add-item"
+              style={{
+                background: "var(--gold)",
+                color: "#fff",
+                padding: "10px 22px",
+                borderRadius: 999,
+                fontFamily: "var(--font-display)",
+                fontWeight: 700,
+                fontSize: 13,
+                textDecoration: "none",
+              }}
+            >
+              + Add new item
+            </Link>
           </div>
 
           {itemsLoading ? (
             <div style={{ display: "grid", gap: 14 }}>
-              {[...Array(4)].map((_, i) => <div key={i} className="skeleton" style={{ height: 90, borderRadius: 14 }} />)}
+              {[...Array(4)].map((_, i) => (
+                <div
+                  key={i}
+                  className="skeleton"
+                  style={{ height: 90, borderRadius: 14 }}
+                />
+              ))}
             </div>
           ) : myItems.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "48px 24px", color: "var(--ink-400)" }}>
+            <div
+              style={{
+                textAlign: "center",
+                padding: "48px 24px",
+                color: "var(--ink-400)",
+              }}
+            >
               <div style={{ fontSize: 40, marginBottom: 12 }}>📦</div>
-              <p style={{ fontWeight: 600, fontSize: 16, color: "var(--ink-700)" }}>No items posted yet</p>
-              <p style={{ fontSize: 14, marginTop: 6 }}>Start giving — post your first item today.</p>
+              <p
+                style={{
+                  fontWeight: 600,
+                  fontSize: 16,
+                  color: "var(--ink-700)",
+                }}
+              >
+                No items posted yet
+              </p>
+              <p style={{ fontSize: 14, marginTop: 6 }}>
+                Start giving — post your first item today.
+              </p>
             </div>
           ) : (
             <div style={{ display: "grid", gap: 12 }}>
-              {myItems.map(item => (
-                <div key={item.id} style={{
-                  background: "var(--white)", borderRadius: 14, padding: "16px 20px",
-                  boxShadow: "var(--shadow-card)", border: "1px solid var(--ink-100)",
-                  display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
-                }}>
+              {myItems.map((item) => (
+                <div
+                  key={item.id}
+                  style={{
+                    background: "var(--white)",
+                    borderRadius: 14,
+                    padding: "16px 20px",
+                    boxShadow: "var(--shadow-card)",
+                    border: "1px solid var(--ink-100)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                  }}
+                >
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontWeight: 700, fontFamily: "var(--font-display)", fontSize: 15, color: "var(--ink-900)", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <p
+                      style={{
+                        fontWeight: 700,
+                        fontFamily: "var(--font-display)",
+                        fontSize: 15,
+                        color: "var(--ink-900)",
+                        marginBottom: 4,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
                       {item.name}
                     </p>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                      <span style={{ fontSize: 12, color: "var(--ink-400)" }}>{item.categories?.name || "—"}</span>
-                      <span style={{
-                        padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 600,
-                        background: item.is_completed ? "#dcfce7" : item.is_locked ? "#fef3c7" : "#f0fdf4",
-                        color: item.is_completed ? "#166534" : item.is_locked ? "#92400e" : "var(--green-700)",
-                      }}>
-                        {item.is_completed ? "Completed" : item.is_locked ? "Locked" : "Available"}
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <span style={{ fontSize: 12, color: "var(--ink-400)" }}>
+                        {item.categories?.name || "—"}
+                      </span>
+                      <span
+                        style={{
+                          padding: "2px 8px",
+                          borderRadius: 999,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          background: item.is_completed
+                            ? "#dcfce7"
+                            : item.is_locked
+                              ? "#fef3c7"
+                              : "#f0fdf4",
+                          color: item.is_completed
+                            ? "#166534"
+                            : item.is_locked
+                              ? "#92400e"
+                              : "var(--green-700)",
+                        }}
+                      >
+                        {item.is_completed
+                          ? "Completed"
+                          : item.is_locked
+                            ? "Locked"
+                            : "Available"}
                       </span>
                     </div>
                   </div>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
-                    <Link href={`/item/${item.id}`} style={{
-                      fontSize: 12, color: "var(--green-700)", fontWeight: 600,
-                      textDecoration: "none", padding: "6px 12px",
-                      border: "1.5px solid var(--green-100)", borderRadius: 8,
-                    }}>View</Link>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 8,
+                      alignItems: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Link
+                      href={`/item/${item.id}`}
+                      style={{
+                        fontSize: 12,
+                        color: "var(--green-700)",
+                        fontWeight: 600,
+                        textDecoration: "none",
+                        padding: "6px 12px",
+                        border: "1.5px solid var(--green-100)",
+                        borderRadius: 8,
+                      }}
+                    >
+                      View
+                    </Link>
                     <button
                       onClick={() => deleteMyItem(item.id, item.is_locked)}
                       style={{
-                        fontSize: 12, color: "#dc2626", fontWeight: 600,
-                        background: "none", border: "1.5px solid #fecaca",
-                        borderRadius: 8, padding: "6px 12px", cursor: "pointer",
+                        fontSize: 12,
+                        color: "#dc2626",
+                        fontWeight: 600,
+                        background: "none",
+                        border: "1.5px solid #fecaca",
+                        borderRadius: 8,
+                        padding: "6px 12px",
+                        cursor: "pointer",
                       }}
-                    >Delete</button>
+                    >
+                      Delete
+                    </button>
                   </div>
                 </div>
               ))}
