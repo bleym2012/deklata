@@ -148,10 +148,7 @@ export default function ItemDetailsPage() {
                 "Content-Type": "application/json",
                 Authorization: "Bearer " + session.access_token,
               },
-              body: JSON.stringify({
-                type: "new_request",
-                request_id: requestRow.id,
-              }),
+              body: JSON.stringify({ item_id: id }),
             },
           );
         }
