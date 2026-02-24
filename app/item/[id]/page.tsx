@@ -109,18 +109,19 @@ export default function ItemDetailsPage() {
     }
 
     try {
-      const { data: itemData } = await supabase
+      const { data: itemData, error: itemErr } = await supabase
         .from("items")
         .select("name, owner_id")
         .eq("id", id)
         .single();
+      console.log("[EMAIL] itemData:", itemData, "itemErr:", itemErr);
       if (itemData) {
-        const { data: ownerProfile } = await supabase
+        const { data: ownerProfile, error: ownerErr } = await supabase
           .from("profiles")
           .select("email, full_name")
           .eq("id", itemData.owner_id)
           .single();
-        const { data: requesterProfile } = await supabase
+        const { data: requesterProfile, error: reqErr } = await supabase
           .from("profiles")
           .select("email, full_name")
           .eq("id", userId)
@@ -128,8 +129,21 @@ export default function ItemDetailsPage() {
         const {
           data: { session },
         } = await supabase.auth.getSession();
+        console.log(
+          "[EMAIL] ownerProfile:",
+          ownerProfile,
+          "ownerErr:",
+          ownerErr,
+        );
+        console.log(
+          "[EMAIL] requesterProfile:",
+          requesterProfile,
+          "reqErr:",
+          reqErr,
+        );
+        console.log("[EMAIL] session token present:", !!session?.access_token);
         if (ownerProfile && requesterProfile && session?.access_token) {
-          await fetch(
+          const res = await fetch(
             "https://iibknadykycghvbjbwxs.supabase.co/functions/v1/notify-owner-request",
             {
               method: "POST",
@@ -140,10 +154,21 @@ export default function ItemDetailsPage() {
               body: JSON.stringify({ type: "new_request", request_id: data }),
             },
           );
+          const resText = await res.text();
+          console.log("[EMAIL] Edge function response:", res.status, resText);
+        } else {
+          console.warn(
+            "[EMAIL] Guard failed — ownerProfile:",
+            !!ownerProfile,
+            "requesterProfile:",
+            !!requesterProfile,
+            "token:",
+            !!session?.access_token,
+          );
         }
       }
     } catch (emailError) {
-      console.error("Email notification failed:", emailError);
+      console.error("[EMAIL] Notification failed:", emailError);
     }
 
     await loadItem();
