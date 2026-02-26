@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 72" width="380" height="72" role="img" aria-label="Deklata">
+  <defs>
+    <!-- Slightly lighter in dark mode so icon lifts off dark header -->
+    <linearGradient id="iconBgDk" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2d7a52"/>
+      <stop offset="100%" stop-color="#236b47"/>
+    </linearGradient>
+    <linearGradient id="goldBarDk" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%"   stop-color="#f2bb38"/>
+      <stop offset="100%" stop-color="#e8a020"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ═══════════════════════════
+       ICON MARK
+       ═══════════════════════════ -->
+  <g>
+    <!-- Rounded square — lighter green on dark bg -->
+    <rect x="0" y="0" width="72" height="72" rx="14" fill="url(#iconBgDk)"/>
+    <!-- Subtle white rim so icon separates from dark surface -->
+    <rect x="0" y="0" width="72" height="72" rx="14"
+          fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="1.2"/>
+
+    <!-- D stem -->
+    <rect x="12" y="11" width="13" height="42" rx="1" fill="white"/>
+
+    <!-- D bowl outer -->
+    <path d="
+      M 25 11
+      L 36 11
+      C 55 11 63 20 63 32
+      C 63 44 55 53 36 53
+      L 25 53
+      Z
+    " fill="white"/>
+
+    <!-- D counter — green square -->
+    <rect x="25" y="20" width="22" height="24" rx="1" fill="url(#iconBgDk)"/>
+
+    <!-- Gold bar -->
+    <rect x="8" y="59" width="56" height="7" rx="3.5" fill="url(#goldBarDk)"/>
+  </g>
+
+  <!-- ═══════════════════════════
+       WORDMARK — white on dark
+       ═══════════════════════════ -->
+  <text x="86" y="50"
+    font-family="'Helvetica Neue', 'Arial', sans-serif"
+    font-weight="700" font-size="40" letter-spacing="-0.5"
+    fill="#ffffff">Deklata</text>
+
+  <!-- Gold underline -->
+  <line x1="86" y1="61" x2="366" y2="61"
+        stroke="url(#goldBarDk)" stroke-width="3.5"
+        stroke-linecap="round" opacity="1"/>
+
+</svg>

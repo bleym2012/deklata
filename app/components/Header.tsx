@@ -21,14 +21,18 @@ export default function Header() {
       if (data.user) fetchPendingCount(data.user.id);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      setAuthLoading(false);
-      if (session?.user) fetchPendingCount(session.user.id);
-      else setPendingCount(0);
-    });
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user ?? null);
+        setAuthLoading(false);
+        if (session?.user) fetchPendingCount(session.user.id);
+        else setPendingCount(0);
+      },
+    );
 
-    return () => { listener.subscription.unsubscribe(); };
+    return () => {
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   async function fetchPendingCount(uid: string) {
@@ -41,7 +45,9 @@ export default function Header() {
   }
 
   // Close menu on route change
-  useEffect(() => { setMenuOpen(false); }, [pathname]);
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -57,40 +63,74 @@ export default function Header() {
 
       {user && (
         <>
-          <Link href="/add-item" style={mobile ? mobileLink : { ...desktopLink }}>
-            {mobile ? "Add item" : (
-              <span style={{
-                background: "var(--gold)",
-                color: "var(--white)",
-                padding: "7px 16px",
-                borderRadius: 999,
-                fontFamily: "var(--font-display)",
-                fontWeight: 700,
-                fontSize: 13,
-                letterSpacing: "0.2px",
-              }}>
+          <Link
+            href="/add-item"
+            style={mobile ? mobileLink : { ...desktopLink }}
+          >
+            {mobile ? (
+              "Add item"
+            ) : (
+              <span
+                style={{
+                  background: "var(--gold)",
+                  color: "var(--white)",
+                  padding: "7px 16px",
+                  borderRadius: 999,
+                  fontFamily: "var(--font-display)",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  letterSpacing: "0.2px",
+                }}
+              >
                 + Add item
               </span>
             )}
           </Link>
 
-          <Link href="/dashboard" style={mobile ? mobileLink : { ...desktopLink, position: "relative" }}>
+          <Link
+            href="/dashboard"
+            style={
+              mobile ? mobileLink : { ...desktopLink, position: "relative" }
+            }
+          >
             Dashboard
             {pendingCount > 0 && !mobile && (
-              <span style={{
-                position: "absolute", top: -4, right: -4,
-                background: "var(--gold)", color: "#fff",
-                fontSize: 9, fontWeight: 800, width: 16, height: 16,
-                borderRadius: "50%", display: "flex", alignItems: "center",
-                justifyContent: "center", fontFamily: "var(--font-display)",
-              }}>{pendingCount > 9 ? "9+" : pendingCount}</span>
+              <span
+                style={{
+                  position: "absolute",
+                  top: -4,
+                  right: -4,
+                  background: "var(--gold)",
+                  color: "#fff",
+                  fontSize: 9,
+                  fontWeight: 800,
+                  width: 16,
+                  height: 16,
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontFamily: "var(--font-display)",
+                }}
+              >
+                {pendingCount > 9 ? "9+" : pendingCount}
+              </span>
             )}
             {pendingCount > 0 && mobile && (
-              <span style={{
-                marginLeft: 8, background: "var(--gold)", color: "#fff",
-                fontSize: 10, fontWeight: 800, padding: "1px 7px",
-                borderRadius: 999, fontFamily: "var(--font-display)",
-              }}>{pendingCount}</span>
+              <span
+                style={{
+                  marginLeft: 8,
+                  background: "var(--gold)",
+                  color: "#fff",
+                  fontSize: 10,
+                  fontWeight: 800,
+                  padding: "1px 7px",
+                  borderRadius: 999,
+                  fontFamily: "var(--font-display)",
+                }}
+              >
+                {pendingCount}
+              </span>
             )}
           </Link>
 
@@ -117,15 +157,17 @@ export default function Header() {
             href="/register"
             style={{
               ...(mobile ? mobileLink : desktopLink),
-              ...(mobile ? {} : {
-                background: "var(--green-800)",
-                color: "var(--white)",
-                padding: "7px 18px",
-                borderRadius: 999,
-                fontFamily: "var(--font-display)",
-                fontWeight: 700,
-                fontSize: 13,
-              }),
+              ...(mobile
+                ? {}
+                : {
+                    background: "var(--green-800)",
+                    color: "var(--white)",
+                    padding: "7px 18px",
+                    borderRadius: 999,
+                    fontFamily: "var(--font-display)",
+                    fontWeight: 700,
+                    fontSize: 13,
+                  }),
             }}
           >
             Sign up
@@ -159,41 +201,61 @@ export default function Header() {
 
   return (
     <>
-      <header style={{
-        position: "sticky",
-        top: 0,
-        zIndex: 100,
-        background: "rgba(250,249,246,0.95)",
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
-        borderBottom: "1px solid var(--ink-100)",
-      }}>
-        <div style={{
-          maxWidth: 1140,
-          margin: "0 auto",
-          padding: "0 20px",
-          height: 64,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}>
+      <header
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 100,
+          background: "rgba(250,249,246,0.95)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          borderBottom: "1px solid var(--ink-100)",
+        }}
+      >
+        <div
+          style={{
+            maxWidth: 1140,
+            margin: "0 auto",
+            padding: "0 20px",
+            height: 64,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
           {/* LOGO */}
-          <Link href="/" style={{ display: "inline-flex", alignItems: "center", flexShrink: 0 }}>
-            <Image
-              src="/images/deklata-logo.svg"
-              alt="Deklata"
-              width={120}
-              height={32}
-              priority
-            />
+          <Link
+            href="/"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              flexShrink: 0,
+            }}
+          >
+            <picture>
+              <source
+                srcSet="/images/deklata-logo-dark.svg"
+                media="(prefers-color-scheme: dark)"
+              />
+              <img
+                src="/images/deklata-logo-light.svg"
+                alt="Deklata"
+                width={160}
+                height={40}
+                style={{ display: "block" }}
+              />
+            </picture>
           </Link>
 
           {/* DESKTOP NAV */}
-          <nav style={{
-            display: "flex",
-            gap: 4,
-            alignItems: "center",
-          }} className="desktop-nav">
+          <nav
+            style={{
+              display: "flex",
+              gap: 4,
+              alignItems: "center",
+            }}
+            className="desktop-nav"
+          >
             <NavLinks />
           </nav>
 
@@ -218,47 +280,59 @@ export default function Header() {
               transition: "all 0.2s ease",
             }}
           >
-            <span style={{
-              display: "block",
-              width: 20,
-              height: 2,
-              background: "var(--ink-900)",
-              borderRadius: 2,
-              transition: "all 0.25s ease",
-              transform: menuOpen ? "rotate(45deg) translate(5px, 5px)" : "none",
-            }} />
-            <span style={{
-              display: "block",
-              width: 20,
-              height: 2,
-              background: "var(--ink-900)",
-              borderRadius: 2,
-              transition: "all 0.25s ease",
-              opacity: menuOpen ? 0 : 1,
-            }} />
-            <span style={{
-              display: "block",
-              width: 20,
-              height: 2,
-              background: "var(--ink-900)",
-              borderRadius: 2,
-              transition: "all 0.25s ease",
-              transform: menuOpen ? "rotate(-45deg) translate(5px, -5px)" : "none",
-            }} />
+            <span
+              style={{
+                display: "block",
+                width: 20,
+                height: 2,
+                background: "var(--ink-900)",
+                borderRadius: 2,
+                transition: "all 0.25s ease",
+                transform: menuOpen
+                  ? "rotate(45deg) translate(5px, 5px)"
+                  : "none",
+              }}
+            />
+            <span
+              style={{
+                display: "block",
+                width: 20,
+                height: 2,
+                background: "var(--ink-900)",
+                borderRadius: 2,
+                transition: "all 0.25s ease",
+                opacity: menuOpen ? 0 : 1,
+              }}
+            />
+            <span
+              style={{
+                display: "block",
+                width: 20,
+                height: 2,
+                background: "var(--ink-900)",
+                borderRadius: 2,
+                transition: "all 0.25s ease",
+                transform: menuOpen
+                  ? "rotate(-45deg) translate(5px, -5px)"
+                  : "none",
+              }}
+            />
           </button>
         </div>
 
         {/* MOBILE DRAWER */}
         {menuOpen && (
-          <div style={{
-            borderTop: "1px solid var(--ink-100)",
-            padding: "20px 20px 24px",
-            display: "flex",
-            flexDirection: "column",
-            gap: 6,
-            background: "var(--cream)",
-            animation: "slideDown 0.18s ease",
-          }}>
+          <div
+            style={{
+              borderTop: "1px solid var(--ink-100)",
+              padding: "20px 20px 24px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+              background: "var(--cream)",
+              animation: "slideDown 0.18s ease",
+            }}
+          >
             <NavLinks mobile />
           </div>
         )}
@@ -266,15 +340,27 @@ export default function Header() {
 
       <style jsx>{`
         @keyframes slideDown {
-          from { opacity: 0; transform: translateY(-8px); }
-          to   { opacity: 1; transform: translateY(0); }
+          from {
+            opacity: 0;
+            transform: translateY(-8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
         @media (min-width: 768px) {
-          .desktop-nav { display: flex !important; }
-          .hamburger-btn { display: none !important; }
+          .desktop-nav {
+            display: flex !important;
+          }
+          .hamburger-btn {
+            display: none !important;
+          }
         }
         @media (max-width: 767px) {
-          .desktop-nav { display: none !important; }
+          .desktop-nav {
+            display: none !important;
+          }
         }
       `}</style>
     </>
