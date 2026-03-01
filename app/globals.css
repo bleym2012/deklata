@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap");
 @import "tailwindcss";
 
 /* ================================
@@ -12,45 +12,47 @@
   --green-700: #216945;
   --green-600: #2d8a5e;
   --green-100: #e8f5ee;
-  --green-50:  #f2faf6;
+  --green-50: #f2faf6;
 
-  --gold:      #e8a020;
-  --gold-light:#fdf3dc;
+  --gold: #e8a020;
+  --gold-light: #fdf3dc;
 
-  --cream:     #faf9f6;
-  --white:     #ffffff;
+  --cream: #faf9f6;
+  --white: #ffffff;
 
-  --ink-900:   #111814;
-  --ink-700:   #2d3830;
-  --ink-500:   #5a6860;
-  --ink-300:   #a8b5ae;
-  --ink-100:   #e8ede9;
+  --ink-900: #111814;
+  --ink-700: #2d3830;
+  --ink-500: #5a6860;
+  --ink-300: #a8b5ae;
+  --ink-100: #e8ede9;
 
   /* SEMANTIC TOKENS */
-  --background:   var(--cream);
-  --foreground:   var(--ink-900);
-  --card-bg:      var(--white);
-  --card-border:  var(--ink-100);
-  --muted-text:   var(--ink-500);
-  --link:         var(--green-700);
-  --link-hover:   var(--green-800);
-  --button-bg:    var(--green-800);
-  --button-text:  var(--white);
+  --background: var(--cream);
+  --foreground: var(--ink-900);
+  --card-bg: var(--white);
+  --card-border: var(--ink-100);
+  --muted-text: var(--ink-500);
+  --link: var(--green-700);
+  --link-hover: var(--green-800);
+  --button-bg: var(--green-800);
+  --button-text: var(--white);
 
   /* TYPOGRAPHY */
-  --font-display: 'Syne', sans-serif;
-  --font-body:    'DM Sans', sans-serif;
+  --font-display: "Syne", sans-serif;
+  --font-body: "DM Sans", sans-serif;
 
   /* RADIUS */
-  --radius-sm:  8px;
-  --radius-md:  14px;
-  --radius-lg:  20px;
-  --radius-xl:  28px;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
 
   /* SHADOWS */
-  --shadow-card:   0 2px 12px rgba(15,61,34,0.07), 0 1px 3px rgba(15,61,34,0.05);
-  --shadow-hover:  0 8px 32px rgba(15,61,34,0.12), 0 2px 8px rgba(15,61,34,0.06);
-  --shadow-modal:  0 24px 64px rgba(15,61,34,0.15);
+  --shadow-card:
+    0 2px 12px rgba(15, 61, 34, 0.07), 0 1px 3px rgba(15, 61, 34, 0.05);
+  --shadow-hover:
+    0 8px 32px rgba(15, 61, 34, 0.12), 0 2px 8px rgba(15, 61, 34, 0.06);
+  --shadow-modal: 0 24px 64px rgba(15, 61, 34, 0.15);
 }
 
 /* Tailwind bridge */
@@ -85,7 +87,12 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--font-display);
   color: var(--ink-900);
   letter-spacing: -0.02em;
@@ -109,7 +116,9 @@ h3 {
   font-weight: 700;
 }
 
-p, li, span {
+p,
+li,
+span {
   font-family: var(--font-body);
   font-size: clamp(14px, 3.5vw, 16px);
   line-height: 1.65;
@@ -125,23 +134,30 @@ a:hover {
   color: var(--link-hover);
 }
 
-.card, .details-card {
+.card,
+.details-card {
   background-color: var(--card-bg);
   border: 1px solid var(--card-border);
 }
 
-input, textarea, select {
+input,
+textarea,
+select {
   background-color: var(--card-bg);
   color: var(--foreground);
   border: 1.5px solid var(--ink-100);
   font-family: var(--font-body);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
-input:focus, textarea:focus, select:focus {
+input:focus,
+textarea:focus,
+select:focus {
   outline: none;
   border-color: var(--green-600);
-  box-shadow: 0 0 0 3px rgba(45,138,94,0.12);
+  box-shadow: 0 0 0 3px rgba(45, 138, 94, 0.12);
 }
 
 img {
@@ -150,7 +166,10 @@ img {
   display: block;
 }
 
-button, input, textarea, select {
+button,
+input,
+textarea,
+select {
   max-width: 100%;
   box-sizing: border-box;
 }
@@ -160,14 +179,24 @@ button, input, textarea, select {
    ================================ */
 
 @keyframes pulse {
-  0%   { opacity: 1; }
-  50%  { opacity: 0.45; }
-  100% { opacity: 1; }
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+  100% {
+    opacity: 1;
+  }
 }
 
 @keyframes shimmer {
-  0%   { left: -150px; }
-  100% { left: 100%; }
+  0% {
+    left: -150px;
+  }
+  100% {
+    left: 100%;
+  }
 }
 
 .skeleton {
@@ -178,13 +207,18 @@ button, input, textarea, select {
 }
 
 .skeleton::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: -150px;
   height: 100%;
   width: 150px;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.7), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.7),
+    transparent
+  );
   animation: shimmer 1.3s infinite;
 }
 
@@ -255,7 +289,9 @@ button, input, textarea, select {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
   overflow: hidden;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
   cursor: pointer;
   border: 1px solid var(--ink-100);
 }
@@ -351,13 +387,16 @@ button, input, textarea, select {
   font-weight: 700;
   letter-spacing: 0.2px;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
-  box-shadow: 0 4px 16px rgba(26,92,58,0.25);
+  transition:
+    background 0.15s ease,
+    transform 0.1s ease,
+    box-shadow 0.15s ease;
+  box-shadow: 0 4px 16px rgba(26, 92, 58, 0.25);
 }
 
 .btn-primary:hover {
   background: var(--green-700);
-  box-shadow: 0 6px 20px rgba(26,92,58,0.32);
+  box-shadow: 0 6px 20px rgba(26, 92, 58, 0.32);
 }
 
 .btn-primary:active {
@@ -384,7 +423,9 @@ button, input, textarea, select {
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .btn-danger:hover {
@@ -406,7 +447,9 @@ button, input, textarea, select {
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
   white-space: nowrap;
 }
 
@@ -429,12 +472,14 @@ button, input, textarea, select {
   color: var(--ink-900);
   background: var(--white);
   outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .form-input:focus {
   border-color: var(--green-600);
-  box-shadow: 0 0 0 3px rgba(45,138,94,0.12);
+  box-shadow: 0 0 0 3px rgba(45, 138, 94, 0.12);
 }
 
 .form-input::placeholder {
@@ -445,7 +490,9 @@ button, input, textarea, select {
    CATEGORY BUTTONS
    ================================ */
 
-.category-wrapper { position: relative; }
+.category-wrapper {
+  position: relative;
+}
 
 .category-toggle {
   display: none;
@@ -498,9 +545,17 @@ button, input, textarea, select {
 }
 
 @media (max-width: 768px) {
-  .category-toggle { display: block; }
-  .category-content { display: none; margin-top: 10px; }
-  .category-content.open { display: grid; gap: 8px; }
+  .category-toggle {
+    display: block;
+  }
+  .category-content {
+    display: none;
+    margin-top: 10px;
+  }
+  .category-content.open {
+    display: grid;
+    gap: 8px;
+  }
 }
 
 /* ================================
@@ -535,7 +590,9 @@ button, input, textarea, select {
    ================================ */
 
 @media (min-width: 768px) {
-  html { font-size: 16px; }
+  html {
+    font-size: 16px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -552,42 +609,48 @@ button, input, textarea, select {
 @media (prefers-color-scheme: dark) {
   :root {
     /* Dark palette */
-    --background:  #0d1a12;   /* deep forest black */
-    --foreground:  #e8ede9;   /* warm off-white */
-    --card-bg:     #152019;   /* slightly lighter than bg */
-    --card-border: #243328;   /* subtle green-tinted border */
-    --muted-text:  #7a9882;   /* muted sage */
-    --link:        #4db87a;   /* brighter green for dark bg */
-    --link-hover:  #6ecf94;
+    --background: #0d1a12; /* deep forest black */
+    --foreground: #e8ede9; /* warm off-white */
+    --card-bg: #152019; /* slightly lighter than bg */
+    --card-border: #243328; /* subtle green-tinted border */
+    --muted-text: #7a9882; /* muted sage */
+    --link: #4db87a; /* brighter green for dark bg */
+    --link-hover: #6ecf94;
 
     /* Greens stay vibrant but soften slightly */
-    --green-50:  #0d1f14;
+    --green-50: #0d1f14;
     --green-100: #1a3322;
-    --green-800: #2d8a5e;   /* lighter so buttons stay readable */
+    --green-800: #2d8a5e; /* lighter so buttons stay readable */
     --green-700: #3aa06e;
 
     /* Gold stays punchy */
-    --gold:       #f0b030;
+    --gold: #f0b030;
     --gold-light: #2a1f08;
 
     /* Ink scale inverted */
-    --ink-900:  #e8ede9;
-    --ink-700:  #c0cec4;
-    --ink-500:  #7a9882;
-    --ink-300:  #3d5245;
-    --ink-100:  #1e2e23;
+    --ink-900: #e8ede9;
+    --ink-700: #c0cec4;
+    --ink-500: #7a9882;
+    --ink-300: #3d5245;
+    --ink-100: #1e2e23;
 
     /* White flips to dark card */
     --white: #152019;
 
     /* Shadows use dark tones */
-    --shadow-card:  0 2px 12px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2);
-    --shadow-hover: 0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.25);
-    --shadow-modal: 0 24px 64px rgba(0,0,0,0.6);
+    --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.2);
+    --shadow-hover:
+      0 8px 32px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.25);
+    --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.6);
   }
 
   /* Headings adapt */
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     color: var(--ink-900);
   }
 
@@ -596,7 +659,12 @@ button, input, textarea, select {
     background: #1e2e23;
   }
   .skeleton::after {
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.06),
+      transparent
+    );
   }
 
   /* Item cards on dark */
@@ -660,7 +728,7 @@ button, input, textarea, select {
   }
   .form-input:focus {
     border-color: var(--green-700);
-    box-shadow: 0 0 0 3px rgba(45,138,94,0.18);
+    box-shadow: 0 0 0 3px rgba(45, 138, 94, 0.18);
   }
 
   /* Pagination buttons */
@@ -683,7 +751,7 @@ button, input, textarea, select {
 
   /* Header frosted glass - dark */
   header {
-    background: rgba(13,26,18,0.92) !important;
+    background: rgba(13, 26, 18, 0.92) !important;
     border-bottom-color: var(--card-border) !important;
   }
 
@@ -709,18 +777,30 @@ button, input, textarea, select {
    ================================ */
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Location pill */
 .location-pill {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 4px;
   padding: 4px 10px;
@@ -731,4 +811,7 @@ button, input, textarea, select {
   font-size: 11px;
   font-family: var(--font-body);
   font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
 }

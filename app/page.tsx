@@ -561,7 +561,21 @@ export default function HomePage() {
                     </div>
                     {item.pickup_location && (
                       <span className="location-pill">
-                        📍 {item.pickup_location}
+                        📍&nbsp;
+                        <span
+                          style={{
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            minWidth: 0,
+                            color: "#92400e",
+                            fontSize: 11,
+                            fontFamily: "var(--font-body)",
+                            fontWeight: 500,
+                          }}
+                        >
+                          {item.pickup_location}
+                        </span>
                       </span>
                     )}
                     {item.campus && (
