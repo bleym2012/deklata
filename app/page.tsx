@@ -57,7 +57,7 @@ export default function HomePage() {
     if (selectedCampus !== "all") params.set("campus", selectedCampus);
     if (search.trim()) params.set("q", search);
     router.replace(`/?${params.toString()}`, { scroll: false });
-  }, [page, category, selectedCampus, search, router]);
+  }, [page, category, selectedCampus, search]);
 
   useEffect(() => {
     const CACHE_KEY = "deklata_categories";
@@ -153,15 +153,15 @@ export default function HomePage() {
           ),
         }));
 
+        // Load auth in parallel — don't wait for it before showing items
+        const { data: authData } = await supabase.auth.getUser();
+
         if (!cancelled) {
           setItems(itemsWithImages);
           setTotalCount(count || 0);
+          if (authData?.user) setUserId(authData.user.id);
           setLoading(false);
         }
-
-        supabase.auth.getUser().then(({ data }) => {
-          if (!cancelled && data?.user) setUserId(data.user.id);
-        });
       } catch (err) {
         console.error(err);
         if (!cancelled) setLoading(false);
