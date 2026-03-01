@@ -97,6 +97,11 @@ export default function ItemDetailsPage() {
     if (item?.is_locked) return;
     setRequesting(true);
 
+    // FIX: grab fresh session token HERE, before any async work can stale it
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
     const { data, error } = await supabase.rpc("request_item", {
       p_item_id: id,
       p_user_id: userId,
@@ -109,7 +114,6 @@ export default function ItemDetailsPage() {
     }
 
     try {
-      // Fetch the request ID directly — RPC returns null so we query it ourselves
       const { data: requestRow } = await supabase
         .from("requests")
         .select("id")
@@ -125,6 +129,7 @@ export default function ItemDetailsPage() {
         .select("name, owner_id")
         .eq("id", id)
         .single();
+
       if (itemData && requestRow?.id) {
         const { data: ownerProfile } = await supabase
           .from("profiles")
@@ -136,9 +141,7 @@ export default function ItemDetailsPage() {
           .select("email, name")
           .eq("id", userId)
           .single();
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+
         if (ownerProfile && requesterProfile && session?.access_token) {
           await fetch(
             "https://iibknadykycghvbjbwxs.supabase.co/functions/v1/notify-owner-request",
