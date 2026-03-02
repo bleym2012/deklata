@@ -14,10 +14,10 @@ export default function ItemDetailsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const page = searchParams.get("page") || "1";
-  const category = searchParams.get("category") || "all";
-  const q = searchParams.get("q") || "";
-  const backUrl = `/?page=${page}&category=${category}&q=${q}`;
+  // backUrl = exact URL the user was on before clicking the item
+  // searchParams already contains page, category, q — just pass them straight back
+  const rawParams = searchParams.toString();
+  const backUrl = rawParams ? `/?${rawParams}` : "/";
 
   const [item, setItem] = useState<any>(null);
   const [images, setImages] = useState<any[]>([]);
@@ -97,10 +97,17 @@ export default function ItemDetailsPage() {
     if (item?.is_locked) return;
     setRequesting(true);
 
-    // FIX: grab fresh session token HERE, before any async work can stale it
+    // Get a FRESH session token NOW — before any other async work.
+    // getSession() reads from localStorage and can return stale/null token
+    // after the tab has been open a while. getUser() forces a server round-trip
+    // and refreshes the token, so the session we grab right after is guaranteed valid.
     const {
-      data: { session },
+      data: { user: freshUser },
+    } = await supabase.auth.getUser();
+    const {
+      data: { session: freshSession },
     } = await supabase.auth.getSession();
+    const accessToken = freshSession?.access_token ?? null;
 
     const { data, error } = await supabase.rpc("request_item", {
       p_item_id: id,
@@ -113,51 +120,25 @@ export default function ItemDetailsPage() {
       return;
     }
 
-    try {
-      const { data: requestRow } = await supabase
-        .from("requests")
-        .select("id")
-        .eq("item_id", id)
-        .eq("requester_id", userId)
-        .eq("status", "pending")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
-
-      const { data: itemData } = await supabase
-        .from("items")
-        .select("name, owner_id")
-        .eq("id", id)
-        .single();
-
-      if (itemData && requestRow?.id) {
-        const { data: ownerProfile } = await supabase
-          .from("profiles")
-          .select("email, name")
-          .eq("id", itemData.owner_id)
-          .single();
-        const { data: requesterProfile } = await supabase
-          .from("profiles")
-          .select("email, name")
-          .eq("id", userId)
-          .single();
-
-        if (ownerProfile && requesterProfile && session?.access_token) {
+    // Fire email notification in the background — don't block the UI
+    if (freshUser && accessToken) {
+      (async () => {
+        try {
           await fetch(
             "https://iibknadykycghvbjbwxs.supabase.co/functions/v1/notify-owner-request",
             {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
-                Authorization: "Bearer " + session.access_token,
+                Authorization: "Bearer " + accessToken,
               },
               body: JSON.stringify({ item_id: id }),
             },
           );
+        } catch (emailError) {
+          console.error("Email notification failed:", emailError);
         }
-      }
-    } catch (emailError) {
-      console.error("Email notification failed:", emailError);
+      })();
     }
 
     await loadItem();
@@ -276,7 +257,7 @@ export default function ItemDetailsPage() {
       >
         {/* BACK */}
         <button
-          onClick={() => router.back()}
+          onClick={() => router.push(backUrl)}
           style={{
             background: "none",
             border: "none",
