@@ -661,12 +661,12 @@ export default function OwnerDashboard() {
                     boxShadow: "var(--shadow-card)",
                     border: "1px solid var(--ink-100)",
                     display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 12,
+
+                    flexDirection: "column",
+                    gap: 10,
                   }}
                 >
-                  <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ minWidth: 0, width: "100%" }}>
                     <p
                       style={{
                         fontWeight: 700,
@@ -723,7 +723,7 @@ export default function OwnerDashboard() {
                       display: "flex",
                       gap: 8,
                       alignItems: "center",
-                      flexShrink: 0,
+                      flexWrap: "wrap",
                     }}
                   >
                     <Link
@@ -733,9 +733,10 @@ export default function OwnerDashboard() {
                         color: "var(--green-700)",
                         fontWeight: 600,
                         textDecoration: "none",
-                        padding: "6px 12px",
+                        padding: "7px 16px",
                         border: "1.5px solid var(--green-100)",
                         borderRadius: 8,
+                        whiteSpace: "nowrap",
                       }}
                     >
                       View
@@ -749,8 +750,9 @@ export default function OwnerDashboard() {
                         background: "none",
                         border: "1.5px solid #fecaca",
                         borderRadius: 8,
-                        padding: "6px 12px",
+                        padding: "7px 16px",
                         cursor: "pointer",
+                        whiteSpace: "nowrap",
                       }}
                     >
                       Delete
