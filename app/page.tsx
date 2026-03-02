@@ -1,7 +1,7 @@
 "use client";
 export const dynamic = "force-dynamic";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -11,62 +11,106 @@ const PAGE_SIZE = 20;
 
 export default function HomePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // ── ALL filter state lives in the URL — never in React state ──────────────
+  // Reading directly from searchParams on every render means the URL IS the truth.
+  // No useEffect syncing state→URL. No fighting between state and URL on back-nav.
+  const page = Number(searchParams.get("page")) || 1;
+  const category = searchParams.get("category") || "all";
+  const selectedCampus = searchParams.get("campus") || "all";
+  const q = searchParams.get("q") || "";
+
+  // Search input only needs local state for the controlled input value
+  const [searchInput, setSearchInput] = useState(q);
+  const [debouncedQ, setDebouncedQ] = useState(q);
+
+  // Sync input when URL q changes (Clear button, back-nav with search)
+  const prevQ = useRef(q);
+  useEffect(() => {
+    if (q !== prevQ.current) {
+      prevQ.current = q;
+      setSearchInput(q);
+      setDebouncedQ(q);
+    }
+  }, [q]);
+
+  // Debounce typing — update URL after 400ms, which triggers data reload via searchParams
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function handleSearchChange(value: string) {
+    setSearchInput(value);
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (value.trim()) {
+        params.set("q", value.trim());
+      } else {
+        params.delete("q");
+      }
+      params.delete("page"); // reset to page 1 on new search
+      router.replace(`/?${params.toString()}`, { scroll: false });
+    }, 400);
+  }
+
+  // Push a single param change (category, campus) — always resets page
+  function pushParam(key: string, value: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === "all" || value === "") {
+      params.delete(key);
+    } else {
+      params.set(key, value);
+    }
+    params.delete("page");
+    router.push(`/?${params.toString()}`, { scroll: false });
+  }
+
+  // Pagination — just update page param
+  function pushPage(newPage: number) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (newPage <= 1) {
+      params.delete("page");
+    } else {
+      params.set("page", String(newPage));
+    }
+    router.push(`/?${params.toString()}`, { scroll: false });
+  }
+
+  // Save scroll position and navigate to item — on return, scroll restore fires
+  function goToItem(itemId: string) {
+    sessionStorage.setItem("homeScroll", String(window.scrollY));
+    router.push(`/item/${itemId}?${searchParams.toString()}`);
+  }
+
+  // ── Data ──────────────────────────────────────────────────────────────────
   const [items, setItems] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
-  const searchParams = useSearchParams();
-
-  const [category, setCategory] = useState(
-    searchParams.get("category") || "all",
-  );
-  const [selectedCampus, setSelectedCampus] = useState(
-    searchParams.get("campus") || "all",
-  );
-  const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
-  const [search, setSearch] = useState(searchParams.get("q") || "");
-  const [debouncedSearch, setDebouncedSearch] = useState(
-    searchParams.get("q") || "",
-  );
-
-  // Debounce search — wait 400ms after user stops typing before hitting the DB
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setDebouncedSearch(search);
-      setPage(1);
-    }, 400);
-    return () => clearTimeout(t);
-  }, [search]);
   const [showCategories, setShowCategories] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
+  // Scroll restore — fires once after items finish loading on return from item page
   useEffect(() => {
-    const savedScroll = sessionStorage.getItem("homeScroll");
-    if (savedScroll) {
-      requestAnimationFrame(() => {
-        window.scrollTo(0, Number(savedScroll));
-      });
-    }
-  }, []);
+    if (loading) return;
+    const saved = sessionStorage.getItem("homeScroll");
+    if (!saved) return;
+    const t = setTimeout(() => {
+      window.scrollTo({ top: Number(saved), behavior: "instant" });
+      sessionStorage.removeItem("homeScroll");
+    }, 80);
+    return () => clearTimeout(t);
+  }, [loading]);
 
+  // Categories (cached 24h in localStorage)
   useEffect(() => {
-    const params = new URLSearchParams();
-    if (page > 1) params.set("page", String(page));
-    if (category !== "all") params.set("category", category);
-    if (selectedCampus !== "all") params.set("campus", selectedCampus);
-    if (search.trim()) params.set("q", search);
-    router.replace(`/?${params.toString()}`, { scroll: false });
-  }, [page, category, selectedCampus, search]);
-
-  useEffect(() => {
-    const CACHE_KEY = "deklata_categories";
-    const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+    const KEY = "deklata_categories";
+    const TTL = 24 * 60 * 60 * 1000;
     try {
-      const cached = localStorage.getItem(CACHE_KEY);
+      const cached = localStorage.getItem(KEY);
       if (cached) {
         const { data, ts } = JSON.parse(cached);
-        if (Date.now() - ts < CACHE_TTL) {
+        if (Date.now() - ts < TTL) {
           setCategories(data);
           return;
         }
@@ -80,58 +124,49 @@ export default function HomePage() {
         setCategories(data || []);
         try {
           localStorage.setItem(
-            CACHE_KEY,
+            KEY,
             JSON.stringify({ data: data || [], ts: Date.now() }),
           );
         } catch {}
       });
   }, []);
 
+  // Items — re-runs when URL params change (page, category, campus, q)
   useEffect(() => {
     let cancelled = false;
-    async function loadHomeDataSafe() {
+    async function load() {
       try {
         setLoading(true);
-
-        // Build query with ALL filters server-side — searches entire database
         let query = supabase
           .from("items")
           .select(
-            `id, name, description, pickup_location, owner_id, campus, is_locked, category_id, categories ( id, name )`,
+            `id, name, description, pickup_location, owner_id, campus, is_locked, category_id, created_at, categories ( id, name )`,
             { count: "exact" },
           )
           .eq("status", "available")
           .order("created_at", { ascending: false })
           .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
-        // Server-side search across name + description
-        if (debouncedSearch.trim()) {
+        if (debouncedQ.trim()) {
           query = query.or(
-            `name.ilike.%${debouncedSearch.trim()}%,description.ilike.%${debouncedSearch.trim()}%,pickup_location.ilike.%${debouncedSearch.trim()}%`,
+            `name.ilike.%${debouncedQ.trim()}%,description.ilike.%${debouncedQ.trim()}%,pickup_location.ilike.%${debouncedQ.trim()}%`,
           );
         }
-
-        // Server-side category filter
-        if (category !== "all") {
-          query = query.eq("category_id", category);
-        }
-
-        // Server-side campus filter — match both dash and space variants
+        if (category !== "all") query = query.eq("category_id", category);
         if (selectedCampus !== "all") {
-          const withSpaces = selectedCampus.replace(/-/g, " "); // "uds tamale"
-          const withDashes = selectedCampus; // "uds-tamale"
+          const withSpaces = selectedCampus.replace(/-/g, " ");
           query = query.or(
-            `campus.ilike.%${withSpaces}%,campus.ilike.%${withDashes}%`,
+            `campus.ilike.%${withSpaces}%,campus.ilike.%${selectedCampus}%`,
           );
         }
 
-        const { data: items, count, error: itemsError } = await query;
-        if (itemsError) {
-          console.error(itemsError);
+        const { data: itemData, count, error } = await query;
+        if (error) {
           if (!cancelled) setLoading(false);
           return;
         }
-        if (!items || items.length === 0) {
+
+        if (!itemData?.length) {
           if (!cancelled) {
             setItems([]);
             setTotalCount(0);
@@ -140,43 +175,38 @@ export default function HomePage() {
           return;
         }
 
-        const itemIds = items.map((item: any) => item.id);
+        const ids = itemData.map((i: any) => i.id);
         const { data: images = [] } = await supabase
           .from("item_images")
           .select("item_id, image_url")
-          .in("item_id", itemIds);
+          .in("item_id", ids);
 
-        const itemsWithImages = items.map((item: any) => ({
+        const withImages = itemData.map((item: any) => ({
           ...item,
           item_images: (images ?? []).filter(
             (img: any) => img.item_id === item.id,
           ),
         }));
 
-        // Load auth in parallel — don't wait for it before showing items
-        const { data: authData } = await supabase.auth.getUser();
-
         if (!cancelled) {
-          setItems(itemsWithImages);
+          setItems(withImages);
           setTotalCount(count || 0);
-          if (authData?.user) setUserId(authData.user.id);
           setLoading(false);
         }
+        supabase.auth.getUser().then(({ data }) => {
+          if (!cancelled && data?.user) setUserId(data.user.id);
+        });
       } catch (err) {
         console.error(err);
         if (!cancelled) setLoading(false);
       }
     }
-    loadHomeDataSafe();
+    load();
     return () => {
       cancelled = true;
     };
-  }, [page, debouncedSearch, category, selectedCampus]);
+  }, [page, debouncedQ, category, selectedCampus]);
 
-  // Filtering and pagination now handled server-side by Supabase
-  const filteredItems = items;
-  const paginatedItems = items;
-  const visibleCount = totalCount;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   if (loading) {
@@ -243,11 +273,8 @@ export default function HomePage() {
           </span>
           <input
             placeholder="Search items..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
+            value={searchInput}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="form-input"
             style={{ paddingLeft: 42, paddingRight: 16 }}
           />
@@ -257,15 +284,7 @@ export default function HomePage() {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <select
             value={selectedCampus}
-            onChange={(e) => {
-              const value = e.target.value;
-              const params = new URLSearchParams(searchParams.toString());
-              params.set("campus", value);
-              params.set("page", "1");
-              router.push(`/?${params.toString()}`);
-              setSelectedCampus(value);
-              setPage(1);
-            }}
+            onChange={(e) => pushParam("campus", e.target.value)}
             className="form-input"
             style={{ flex: 1, minWidth: 160 }}
           >
@@ -287,11 +306,9 @@ export default function HomePage() {
 
           <button
             onClick={() => {
-              setCategory("all");
-              setSelectedCampus("all");
-              setSearch("");
-              setPage(1);
-              router.replace("/?page=1", { scroll: false });
+              setSearchInput("");
+              setDebouncedQ("");
+              router.push("/", { scroll: false });
             }}
             className="btn-secondary"
           >
@@ -319,14 +336,7 @@ export default function HomePage() {
             <button
               aria-pressed={category === "all"}
               className={`category-btn ${category === "all" ? "active" : ""}`}
-              onClick={() => {
-                const params = new URLSearchParams(searchParams.toString());
-                params.set("category", "all");
-                params.set("page", "1");
-                router.push(`/?${params.toString()}`);
-                setCategory("all");
-                setPage(1);
-              }}
+              onClick={() => pushParam("category", "all")}
             >
               All
             </button>
@@ -335,14 +345,7 @@ export default function HomePage() {
                 key={cat.id}
                 aria-pressed={category === cat.id}
                 className={`category-btn ${category === cat.id ? "active" : ""}`}
-                onClick={() => {
-                  const params = new URLSearchParams(searchParams.toString());
-                  params.set("category", cat.id);
-                  params.set("page", "1");
-                  router.push(`/?${params.toString()}`);
-                  setCategory(cat.id);
-                  setPage(1);
-                }}
+                onClick={() => pushParam("category", cat.id)}
               >
                 {cat.name}
               </button>
@@ -363,14 +366,14 @@ export default function HomePage() {
         <strong
           style={{ color: "var(--ink-900)", fontFamily: "var(--font-display)" }}
         >
-          {visibleCount}
+          {totalCount}
         </strong>{" "}
-        {visibleCount === 1 ? "item" : "items"} available
+        {totalCount === 1 ? "item" : "items"} available
         {selectedCampus !== "all" && " on this campus"}
       </p>
 
       {/* EMPTY STATE */}
-      {paginatedItems.length === 0 && (
+      {items.length === 0 && (
         <div
           style={{
             textAlign: "center",
@@ -415,18 +418,15 @@ export default function HomePage() {
 
       {/* ITEM GRID */}
       <div className="item-grid">
-        {paginatedItems.map((item) => {
+        {items.map((item) => {
           const isOwner = userId === item.owner_id;
-          const isRequested = !!userId && item.is_locked; // only logged-in users see greyed/locked state
+          const isRequested = !!userId && item.is_locked;
           const hasImage = item.item_images?.length > 0;
-
           return (
             <div
               key={item.id}
               className="item-card"
-              onClick={() =>
-                router.push(`/item/${item.id}?${searchParams.toString()}`)
-              }
+              onClick={() => goToItem(item.id)}
               style={{
                 opacity: !isOwner && isRequested ? 0.5 : 1,
                 pointerEvents: !isOwner && isRequested ? "none" : "auto",
@@ -473,8 +473,6 @@ export default function HomePage() {
                     </span>
                   </div>
                 )}
-
-                {/* BADGES */}
                 {!isOwner && isRequested && (
                   <span className="badge-requested">Requested</span>
                 )}
@@ -484,9 +482,11 @@ export default function HomePage() {
               {/* CONTENT */}
               <Link
                 href={`/item/${item.id}?${searchParams.toString()}`}
-                onClick={() =>
-                  sessionStorage.setItem("homeScroll", String(window.scrollY))
-                }
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  goToItem(item.id);
+                }}
                 style={{
                   display: "block",
                   color: "inherit",
@@ -615,11 +615,10 @@ export default function HomePage() {
           <button
             className="pagination-btn"
             disabled={page === 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            onClick={() => pushPage(page - 1)}
           >
             ← Previous
           </button>
-
           <span
             style={{
               fontSize: 13,
@@ -630,11 +629,10 @@ export default function HomePage() {
             Page <strong style={{ color: "var(--ink-900)" }}>{page}</strong> of{" "}
             <strong style={{ color: "var(--ink-900)" }}>{totalPages}</strong>
           </span>
-
           <button
             className="pagination-btn"
             disabled={page === totalPages}
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            onClick={() => pushPage(page + 1)}
           >
             Next →
           </button>

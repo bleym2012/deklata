@@ -13,6 +13,11 @@ const nextConfig: NextConfig = {
         hostname: "iibknadykycghvbjbwxs.supabase.co",
         pathname: "/storage/v1/object/public/**",
       },
+      // Picsum — placeholder images for seed/testing only
+      {
+        protocol: "https",
+        hostname: "picsum.photos",
+      },
     ],
   },
   // Compress responses
