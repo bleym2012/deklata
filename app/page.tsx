@@ -1,7 +1,7 @@
 "use client";
 export const dynamic = "force-dynamic";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -13,46 +13,129 @@ export default function HomePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // ── ALL filter state lives in the URL — never in React state ──────────────
-  // Reading directly from searchParams on every render means the URL IS the truth.
-  // No useEffect syncing state→URL. No fighting between state and URL on back-nav.
+  // ── URL is the single source of truth for all filter state ────────────────
   const page = Number(searchParams.get("page")) || 1;
   const category = searchParams.get("category") || "all";
   const selectedCampus = searchParams.get("campus") || "all";
   const q = searchParams.get("q") || "";
 
-  // Search input only needs local state for the controlled input value
+  // Local input state — only committed to URL on Search button / Enter
   const [searchInput, setSearchInput] = useState(q);
-  const [debouncedQ, setDebouncedQ] = useState(q);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeSuggestion, setActiveSuggestion] = useState(-1);
+  const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Sync input when URL q changes (Clear button, back-nav with search)
+  // Sync input when URL q changes (back-nav, Clear)
   const prevQ = useRef(q);
   useEffect(() => {
     if (q !== prevQ.current) {
       prevQ.current = q;
       setSearchInput(q);
-      setDebouncedQ(q);
     }
   }, [q]);
 
-  // Debounce typing — update URL after 400ms, which triggers data reload via searchParams
-  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  function handleSearchChange(value: string) {
+  // ── Autocomplete — lightweight name lookup, fires 250ms after typing ──────
+  const fetchSuggestions = useCallback(async (value: string) => {
+    if (value.trim().length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    const { data } = await supabase
+      .from("items")
+      .select("name")
+      .eq("status", "available")
+      .ilike("name", `%${value.trim()}%`)
+      .limit(7);
+    if (data) {
+      const unique = [...new Set(data.map((d: any) => d.name as string))];
+      setSuggestions(unique);
+    }
+  }, []);
+
+  function handleInputChange(value: string) {
     setSearchInput(value);
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(() => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (value.trim()) {
-        params.set("q", value.trim());
-      } else {
-        params.delete("q");
-      }
-      params.delete("page"); // reset to page 1 on new search
-      router.replace(`/?${params.toString()}`, { scroll: false });
-    }, 400);
+    setActiveSuggestion(-1);
+    if (suggestTimer.current) clearTimeout(suggestTimer.current);
+    if (!value.trim()) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    setShowSuggestions(true);
+    suggestTimer.current = setTimeout(() => fetchSuggestions(value), 250);
   }
 
-  // Push a single param change (category, campus) — always resets page
+  // ── Commit search to URL — this is what fires the DB query ───────────────
+  function commitSearch(value: string) {
+    setShowSuggestions(false);
+    setSuggestions([]);
+    const params = new URLSearchParams(searchParams.toString());
+    if (value.trim()) {
+      params.set("q", value.trim());
+    } else {
+      params.delete("q");
+    }
+    params.delete("page");
+    router.push(`/?${params.toString()}`, { scroll: false });
+  }
+
+  function handleSearchSubmit() {
+    commitSearch(searchInput);
+    inputRef.current?.blur();
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveSuggestion((i) => Math.min(i + 1, suggestions.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveSuggestion((i) => Math.max(i - 1, -1));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (activeSuggestion >= 0 && suggestions[activeSuggestion]) {
+        const chosen = suggestions[activeSuggestion];
+        setSearchInput(chosen);
+        commitSearch(chosen);
+      } else {
+        handleSearchSubmit();
+      }
+    } else if (e.key === "Escape") {
+      setShowSuggestions(false);
+    }
+  }
+
+  function handleSuggestionClick(name: string) {
+    setSearchInput(name);
+    commitSearch(name);
+  }
+
+  function handleClear() {
+    setSearchInput("");
+    setSuggestions([]);
+    setShowSuggestions(false);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("q");
+    params.delete("page");
+    router.push(`/?${params.toString()}`, { scroll: false });
+    inputRef.current?.focus();
+  }
+
+  // Close suggestions on outside click
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  // ── Filter helpers ────────────────────────────────────────────────────────
   function pushParam(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
     if (value === "all" || value === "") {
@@ -64,7 +147,6 @@ export default function HomePage() {
     router.push(`/?${params.toString()}`, { scroll: false });
   }
 
-  // Pagination — just update page param
   function pushPage(newPage: number) {
     const params = new URLSearchParams(searchParams.toString());
     if (newPage <= 1) {
@@ -75,7 +157,6 @@ export default function HomePage() {
     router.push(`/?${params.toString()}`, { scroll: false });
   }
 
-  // Save scroll position and navigate to item — on return, scroll restore fires
   function goToItem(itemId: string) {
     sessionStorage.setItem("homeScroll", String(window.scrollY));
     router.push(`/item/${itemId}?${searchParams.toString()}`);
@@ -90,7 +171,7 @@ export default function HomePage() {
   const [showCategories, setShowCategories] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
-  // Scroll restore — fires once after items finish loading on return from item page
+  // Scroll restore on back-nav
   useEffect(() => {
     if (loading) return;
     const saved = sessionStorage.getItem("homeScroll");
@@ -102,7 +183,7 @@ export default function HomePage() {
     return () => clearTimeout(t);
   }, [loading]);
 
-  // Categories (cached 24h in localStorage)
+  // Categories (cached 24h)
   useEffect(() => {
     const KEY = "deklata_categories";
     const TTL = 24 * 60 * 60 * 1000;
@@ -131,7 +212,7 @@ export default function HomePage() {
       });
   }, []);
 
-  // Items — re-runs when URL params change (page, category, campus, q)
+  // Items — re-runs only when URL params change (q committed via Search button)
   useEffect(() => {
     let cancelled = false;
     async function load() {
@@ -147,9 +228,9 @@ export default function HomePage() {
           .order("created_at", { ascending: false })
           .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
-        if (debouncedQ.trim()) {
+        if (q.trim()) {
           query = query.or(
-            `name.ilike.%${debouncedQ.trim()}%,description.ilike.%${debouncedQ.trim()}%,pickup_location.ilike.%${debouncedQ.trim()}%`,
+            `name.ilike.%${q.trim()}%,description.ilike.%${q.trim()}%,pickup_location.ilike.%${q.trim()}%`,
           );
         }
         if (category !== "all") query = query.eq("category_id", category);
@@ -205,10 +286,11 @@ export default function HomePage() {
     return () => {
       cancelled = true;
     };
-  }, [page, debouncedQ, category, selectedCampus]);
+  }, [page, q, category, selectedCampus]);
 
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
+  // ── Skeleton ──────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <main style={{ maxWidth: 1140, margin: "0 auto", padding: "28px 20px" }}>
@@ -256,28 +338,171 @@ export default function HomePage() {
           marginBottom: 20,
         }}
       >
-        {/* SEARCH */}
-        <div style={{ position: "relative", marginBottom: 12 }}>
-          <span
+        {/* ── SEARCH BAR ── */}
+        <div ref={searchRef} style={{ position: "relative", marginBottom: 12 }}>
+          {/* Input + buttons row */}
+          <div
             style={{
-              position: "absolute",
-              left: 14,
-              top: "50%",
-              transform: "translateY(-50%)",
-              color: "var(--ink-300)",
-              fontSize: 16,
-              pointerEvents: "none",
+              display: "flex",
+              alignItems: "center",
+              background: "#fff",
+              border: "1.5px solid var(--ink-200)",
+              borderRadius: 12,
+              overflow: "hidden",
             }}
           >
-            🔍
-          </span>
-          <input
-            placeholder="Search items..."
-            value={searchInput}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            className="form-input"
-            style={{ paddingLeft: 42, paddingRight: 16 }}
-          />
+            {/* Search icon */}
+            <span
+              style={{
+                paddingLeft: 14,
+                fontSize: 16,
+                color: "var(--ink-300)",
+                flexShrink: 0,
+                pointerEvents: "none",
+                userSelect: "none",
+              }}
+            >
+              🔍
+            </span>
+
+            {/* Input */}
+            <input
+              ref={inputRef}
+              placeholder="Search items..."
+              value={searchInput}
+              onChange={(e) => handleInputChange(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onFocus={() => {
+                if (searchInput.trim() && suggestions.length > 0)
+                  setShowSuggestions(true);
+              }}
+              style={{
+                flex: 1,
+                border: "none",
+                outline: "none",
+                background: "transparent",
+                fontSize: 15,
+                fontFamily: "var(--font-body)",
+                color: "var(--ink-900)",
+                padding: "12px 8px",
+                minWidth: 0,
+              }}
+            />
+
+            {/* X clear button */}
+            {searchInput && (
+              <button
+                onClick={handleClear}
+                aria-label="Clear search"
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "0 6px",
+                  color: "var(--ink-400)",
+                  fontSize: 16,
+                  lineHeight: 1,
+                  flexShrink: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 28,
+                  height: 28,
+                }}
+              >
+                ✕
+              </button>
+            )}
+
+            {/* Divider */}
+            <div
+              style={{
+                width: 1,
+                height: 24,
+                background: "var(--ink-100)",
+                flexShrink: 0,
+                margin: "0 2px",
+              }}
+            />
+
+            {/* Search button */}
+            <button
+              onClick={handleSearchSubmit}
+              style={{
+                background: "var(--green-800)",
+                color: "#fff",
+                border: "none",
+                borderRadius: "0 10px 10px 0",
+                padding: "0 18px",
+                height: 46,
+                fontFamily: "var(--font-display)",
+                fontWeight: 700,
+                fontSize: 14,
+                cursor: "pointer",
+                flexShrink: 0,
+                whiteSpace: "nowrap",
+              }}
+            >
+              Search
+            </button>
+          </div>
+
+          {/* ── SUGGESTIONS DROPDOWN ── */}
+          {showSuggestions && suggestions.length > 0 && (
+            <div
+              style={{
+                position: "absolute",
+                top: "calc(100% + 4px)",
+                left: 0,
+                right: 0,
+                background: "#fff",
+                border: "1.5px solid var(--ink-150, #e5e3df)",
+                borderRadius: 12,
+                boxShadow: "0 8px 24px rgba(0,0,0,0.10)",
+                zIndex: 200,
+                overflow: "hidden",
+              }}
+            >
+              {suggestions.map((name, i) => (
+                <div
+                  key={name}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handleSuggestionClick(name);
+                  }}
+                  onMouseEnter={() => setActiveSuggestion(i)}
+                  onMouseLeave={() => setActiveSuggestion(-1)}
+                  style={{
+                    padding: "11px 16px",
+                    fontSize: 14,
+                    fontFamily: "var(--font-body)",
+                    color: "var(--ink-900)",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    background:
+                      activeSuggestion === i ? "var(--green-50)" : "#fff",
+                    borderBottom:
+                      i < suggestions.length - 1
+                        ? "1px solid var(--ink-100)"
+                        : "none",
+                  }}
+                >
+                  <span
+                    style={{
+                      color: "var(--ink-300)",
+                      fontSize: 13,
+                      flexShrink: 0,
+                    }}
+                  >
+                    🔍
+                  </span>
+                  <span>{highlightMatch(name, searchInput)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* CAMPUS + CONTROLS */}
@@ -307,7 +532,8 @@ export default function HomePage() {
           <button
             onClick={() => {
               setSearchInput("");
-              setDebouncedQ("");
+              setSuggestions([]);
+              setShowSuggestions(false);
               router.push("/", { scroll: false });
             }}
             className="btn-secondary"
@@ -370,6 +596,12 @@ export default function HomePage() {
         </strong>{" "}
         {totalCount === 1 ? "item" : "items"} available
         {selectedCampus !== "all" && " on this campus"}
+        {q && (
+          <span style={{ color: "var(--green-700)", fontWeight: 600 }}>
+            {" "}
+            for "{q}"
+          </span>
+        )}
       </p>
 
       {/* EMPTY STATE */}
@@ -433,7 +665,6 @@ export default function HomePage() {
                 position: "relative",
               }}
             >
-              {/* IMAGE */}
               <div
                 style={{
                   height: 160,
@@ -479,7 +710,6 @@ export default function HomePage() {
                 <span className="badge-free">FREE</span>
               </div>
 
-              {/* CONTENT */}
               <Link
                 href={`/item/${item.id}?${searchParams.toString()}`}
                 onClick={(e) => {
@@ -639,5 +869,21 @@ export default function HomePage() {
         </div>
       )}
     </main>
+  );
+}
+
+// Bold the matched portion in suggestion text
+function highlightMatch(text: string, query: string) {
+  if (!query.trim()) return <>{text}</>;
+  const idx = text.toLowerCase().indexOf(query.trim().toLowerCase());
+  if (idx === -1) return <>{text}</>;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <strong style={{ color: "var(--green-800)", fontWeight: 700 }}>
+        {text.slice(idx, idx + query.trim().length)}
+      </strong>
+      {text.slice(idx + query.trim().length)}
+    </>
   );
 }
