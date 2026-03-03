@@ -170,6 +170,20 @@ export default function HomePage() {
   const [totalCount, setTotalCount] = useState(0);
   const [showCategories, setShowCategories] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [bannerVisible, setBannerVisible] = useState(true);
+
+  // Hide banner on scroll — show again only if back at very top
+  useEffect(() => {
+    let lastY = window.scrollY;
+    function onScroll() {
+      const y = window.scrollY;
+      if (y > 40) setBannerVisible(false);
+      else if (y === 0) setBannerVisible(true);
+      lastY = y;
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   // Scroll restore on back-nav
   useEffect(() => {
@@ -323,6 +337,76 @@ export default function HomePage() {
         boxSizing: "border-box",
       }}
     >
+      {/* ── HERO BANNER ── */}
+      <div
+        style={{
+          overflow: "hidden",
+          maxHeight: bannerVisible ? 120 : 0,
+          opacity: bannerVisible ? 1 : 0,
+          transition: "max-height 0.35s ease, opacity 0.3s ease",
+          marginBottom: bannerVisible ? 0 : 0,
+        }}
+      >
+        <div
+          style={{
+            background: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)",
+            border: "1px solid #bbf7d0",
+            borderRadius: 16,
+            padding: "18px 20px",
+            margin: "16px 0 0",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+          }}
+        >
+          {/* Text */}
+          <div style={{ minWidth: 0 }}>
+            <p
+              style={{
+                fontFamily: "var(--font-display)",
+                fontWeight: 800,
+                fontSize: 18,
+                color: "var(--green-900, #14532d)",
+                margin: 0,
+                lineHeight: 1.25,
+                letterSpacing: "-0.3px",
+              }}
+            >
+              Give what you don&apos;t need.{" "}
+              <span style={{ color: "var(--green-700)" }}>
+                Get what you do.
+              </span>
+            </p>
+            <p
+              style={{
+                fontFamily: "var(--font-body)",
+                fontSize: 13,
+                color: "var(--green-700)",
+                margin: "5px 0 0",
+                lineHeight: 1.4,
+              }}
+            >
+              Free student item exchange across Tamale campuses. 100% free,
+              always.
+            </p>
+          </div>
+
+          {/* Emoji accent */}
+          <span
+            style={{
+              fontSize: 36,
+              flexShrink: 0,
+              lineHeight: 1,
+              filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.08))",
+            }}
+            aria-hidden
+          >
+            🎓
+          </span>
+        </div>
+      </div>
+
       {/* STICKY FILTER BAR */}
       <div
         style={{
