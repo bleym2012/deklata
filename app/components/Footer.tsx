@@ -9,61 +9,112 @@ export default function Footer() {
   const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => { setUser(data.user); setAuthChecked(true); });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null); setAuthChecked(true);
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user);
+      setAuthChecked(true);
     });
-    return () => { listener.subscription.unsubscribe(); };
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user ?? null);
+        setAuthChecked(true);
+      },
+    );
+    return () => {
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   return (
-    <footer style={{ borderTop: "1px solid var(--ink-100)", marginTop: 80, background: "var(--green-900)" }}>
-      <div style={{
-        maxWidth: 1140,
-        margin: "0 auto",
-        padding: "48px 24px 32px",
-        display: "grid",
-        gap: 40,
-        fontFamily: "var(--font-body)",
-      }}>
+    <footer
+      style={{
+        borderTop: "1px solid var(--ink-100)",
+        marginTop: 80,
+        background: "var(--green-900)",
+      }}
+    >
+      <div
+        style={{
+          maxWidth: 1140,
+          margin: "0 auto",
+          padding: "48px 24px 32px",
+          display: "grid",
+          gap: 40,
+          fontFamily: "var(--font-body)",
+        }}
+      >
         {/* TOP */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 40, justifyContent: "space-between" }}>
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 40,
+            justifyContent: "space-between",
+          }}
+        >
           {/* BRAND */}
           <div style={{ maxWidth: 280 }}>
-            <h3 style={{
-              fontSize: 22,
-              fontWeight: 800,
-              marginBottom: 10,
-              color: "var(--white)",
-              fontFamily: "var(--font-display)",
-              letterSpacing: "-0.03em",
-            }}>
+            <h3
+              style={{
+                fontSize: 22,
+                fontWeight: 800,
+                marginBottom: 10,
+                color: "var(--white)",
+                fontFamily: "var(--font-display)",
+                letterSpacing: "-0.03em",
+              }}
+            >
               Deklata
             </h3>
-            <p style={{ fontSize: 14, color: "rgba(255,255,255,0.55)", lineHeight: 1.7, margin: 0 }}>
-              Connecting Ghanaian students who have extra items with those who need them — safely, simply, and for free.
+            <p
+              style={{
+                fontSize: 14,
+                color: "rgba(255,255,255,0.55)",
+                lineHeight: 1.7,
+                margin: 0,
+              }}
+            >
+              Connecting Ghanaian students who have extra items with those who
+              need them — safely, simply, and for free.
             </p>
 
             {/* SOCIAL */}
             <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
               {[
-                { href: "https://instagram.com/yourhandle", icon: <InstagramIcon /> },
-                { href: "https://twitter.com/deklatapp", icon: <TwitterIcon /> },
-                { href: "https://facebook.com/yourhandle", icon: <FacebookIcon /> },
-                { href: "https://tiktok.com/@yourhandle", icon: <TikTokIcon /> },
+                {
+                  href: "https://instagram.com/yourhandle",
+                  icon: <InstagramIcon />,
+                },
+                {
+                  href: "https://twitter.com/deklatapp",
+                  icon: <TwitterIcon />,
+                },
+                {
+                  href: "https://facebook.com/yourhandle",
+                  icon: <FacebookIcon />,
+                },
+                {
+                  href: "https://tiktok.com/@yourhandle",
+                  icon: <TikTokIcon />,
+                },
               ].map((s, i) => (
-                <a key={i} href={s.href} target="_blank" rel="noopener noreferrer" style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: 36,
-                  height: 36,
-                  borderRadius: 10,
-                  background: "rgba(255,255,255,0.08)",
-                  color: "rgba(255,255,255,0.6)",
-                  transition: "all 0.2s ease",
-                  textDecoration: "none",
-                }}>
+                <a
+                  key={i}
+                  href={s.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 36,
+                    height: 36,
+                    borderRadius: 10,
+                    background: "rgba(255,255,255,0.08)",
+                    color: "rgba(255,255,255,0.6)",
+                    transition: "all 0.2s ease",
+                    textDecoration: "none",
+                  }}
+                >
                   {s.icon}
                 </a>
               ))}
@@ -73,17 +124,41 @@ export default function Footer() {
           {/* LINKS */}
           <div style={{ display: "flex", gap: 48, flexWrap: "wrap" }}>
             <div>
-              <p style={{ fontSize: 11, fontWeight: 700, marginBottom: 12, color: "rgba(255,255,255,0.35)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+              <p
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  marginBottom: 12,
+                  color: "rgba(255,255,255,0.35)",
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                }}
+              >
                 Explore
               </p>
-              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 10 }}>
+              <ul
+                style={{
+                  listStyle: "none",
+                  padding: 0,
+                  margin: 0,
+                  display: "grid",
+                  gap: 10,
+                }}
+              >
                 {[
                   { href: "/", label: "Browse items" },
                   { href: "/how-it-works", label: "How it works" },
                   { href: "/add-item", label: "Give an item" },
                 ].map((l) => (
                   <li key={l.href}>
-                    <Link href={l.href} style={{ fontSize: 14, color: "rgba(255,255,255,0.55)", textDecoration: "none" }}>
+                    <Link
+                      href={l.href}
+                      style={{
+                        fontSize: 14,
+                        color: "rgba(255,255,255,0.55)",
+                        textDecoration: "none",
+                      }}
+                    >
                       {l.label}
                     </Link>
                   </li>
@@ -92,23 +167,95 @@ export default function Footer() {
             </div>
 
             <div>
-              <p style={{ fontSize: 11, fontWeight: 700, marginBottom: 12, color: "rgba(255,255,255,0.35)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+              <p
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  marginBottom: 12,
+                  color: "rgba(255,255,255,0.35)",
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                }}
+              >
                 Account
               </p>
-              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 10 }}>
+              <ul
+                style={{
+                  listStyle: "none",
+                  padding: 0,
+                  margin: 0,
+                  display: "grid",
+                  gap: 10,
+                }}
+              >
                 {!authChecked ? null : (
                   <>
                     {!user && (
                       <>
-                        <li><Link href="/login" style={{ fontSize: 14, color: "rgba(255,255,255,0.55)", textDecoration: "none" }}>Login</Link></li>
-                        <li><Link href="/register" style={{ fontSize: 14, color: "rgba(255,255,255,0.55)", textDecoration: "none" }}>Sign up</Link></li>
+                        <li>
+                          <Link
+                            href="/login"
+                            style={{
+                              fontSize: 14,
+                              color: "rgba(255,255,255,0.55)",
+                              textDecoration: "none",
+                            }}
+                          >
+                            Login
+                          </Link>
+                        </li>
+                        <li>
+                          <Link
+                            href="/register"
+                            style={{
+                              fontSize: 14,
+                              color: "rgba(255,255,255,0.55)",
+                              textDecoration: "none",
+                            }}
+                          >
+                            Sign up
+                          </Link>
+                        </li>
                       </>
                     )}
                     {user && (
                       <>
-                        <li><Link href="/dashboard" style={{ fontSize: 14, color: "rgba(255,255,255,0.55)", textDecoration: "none" }}>Dashboard</Link></li>
-                        <li><Link href="/my-requests" style={{ fontSize: 14, color: "rgba(255,255,255,0.55)", textDecoration: "none" }}>My requests</Link></li>
-                        <li><Link href="/profile" style={{ fontSize: 14, color: "rgba(255,255,255,0.55)", textDecoration: "none" }}>Profile</Link></li>
+                        <li>
+                          <Link
+                            href="/dashboard"
+                            style={{
+                              fontSize: 14,
+                              color: "rgba(255,255,255,0.55)",
+                              textDecoration: "none",
+                            }}
+                          >
+                            Dashboard
+                          </Link>
+                        </li>
+                        <li>
+                          <Link
+                            href="/my-requests"
+                            style={{
+                              fontSize: 14,
+                              color: "rgba(255,255,255,0.55)",
+                              textDecoration: "none",
+                            }}
+                          >
+                            My requests
+                          </Link>
+                        </li>
+                        <li>
+                          <Link
+                            href="/profile"
+                            style={{
+                              fontSize: 14,
+                              color: "rgba(255,255,255,0.55)",
+                              textDecoration: "none",
+                            }}
+                          >
+                            Profile
+                          </Link>
+                        </li>
                       </>
                     )}
                   </>
@@ -117,30 +264,84 @@ export default function Footer() {
             </div>
 
             <div>
-              <p style={{ fontSize: 11, fontWeight: 700, marginBottom: 12, color: "rgba(255,255,255,0.35)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+              <p
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  marginBottom: 12,
+                  color: "rgba(255,255,255,0.35)",
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                }}
+              >
                 Legal
               </p>
-              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 10 }}>
-                <li><Link href="/terms" style={{ fontSize: 14, color: "rgba(255,255,255,0.55)", textDecoration: "none" }}>Terms of Use</Link></li>
-                <li><Link href="/guidelines" style={{ fontSize: 14, color: "rgba(255,255,255,0.55)", textDecoration: "none" }}>Community Guidelines</Link></li>
-                <li><Link href="/contact" style={{ fontSize: 14, color: "rgba(255,255,255,0.55)", textDecoration: "none" }}>Contact</Link></li>
+              <ul
+                style={{
+                  listStyle: "none",
+                  padding: 0,
+                  margin: 0,
+                  display: "grid",
+                  gap: 10,
+                }}
+              >
+                <li>
+                  <Link
+                    href="/terms"
+                    style={{
+                      fontSize: 14,
+                      color: "rgba(255,255,255,0.55)",
+                      textDecoration: "none",
+                    }}
+                  >
+                    Terms of Use
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/guidelines"
+                    style={{
+                      fontSize: 14,
+                      color: "rgba(255,255,255,0.55)",
+                      textDecoration: "none",
+                    }}
+                  >
+                    Community Guidelines
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/contact"
+                    style={{
+                      fontSize: 14,
+                      color: "rgba(255,255,255,0.55)",
+                      textDecoration: "none",
+                    }}
+                  >
+                    Contact
+                  </Link>
+                </li>
               </ul>
             </div>
           </div>
         </div>
 
         {/* BOTTOM */}
-        <div style={{
-          borderTop: "1px solid rgba(255,255,255,0.08)",
-          paddingTop: 20,
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 10,
-          justifyContent: "space-between",
-          fontSize: 12,
-          color: "rgba(255,255,255,0.3)",
-        }}>
-          <span>© {new Date().getFullYear()} Deklata. All rights reserved.</span>
+        <div
+          style={{
+            borderTop: "1px solid rgba(255,255,255,0.08)",
+            paddingTop: 20,
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 10,
+            justifyContent: "space-between",
+            fontSize: 12,
+            color: "rgba(255,255,255,0.5)",
+          }}
+        >
+          <span>
+            © {new Date().getFullYear()} Deklata. All rights reserved.
+          </span>
           <span>Made with ❤️ for Ghanaian students</span>
         </div>
       </div>
