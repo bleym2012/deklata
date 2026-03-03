@@ -348,6 +348,7 @@ export default function HomePage() {
         }}
       >
         <div
+          className="hero-banner"
           style={{
             background: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)",
             border: "1px solid #bbf7d0",
@@ -363,6 +364,7 @@ export default function HomePage() {
           {/* Text */}
           <div style={{ minWidth: 0 }}>
             <p
+              className="hero-banner-headline"
               style={{
                 fontFamily: "var(--font-display)",
                 fontWeight: 800,
@@ -379,6 +381,7 @@ export default function HomePage() {
               </span>
             </p>
             <p
+              className="hero-banner-sub"
               style={{
                 fontFamily: "var(--font-body)",
                 fontSize: 13,
@@ -426,6 +429,7 @@ export default function HomePage() {
         <div ref={searchRef} style={{ position: "relative", marginBottom: 12 }}>
           {/* Input + buttons row */}
           <div
+            className="search-bar-input-row"
             style={{
               display: "flex",
               alignItems: "center",
@@ -460,6 +464,7 @@ export default function HomePage() {
                 if (searchInput.trim() && suggestions.length > 0)
                   setShowSuggestions(true);
               }}
+              className="search-bar-input"
               style={{
                 flex: 1,
                 border: "none",
@@ -478,6 +483,7 @@ export default function HomePage() {
               <button
                 onClick={handleClear}
                 aria-label="Clear search"
+                className="search-bar-clear"
                 style={{
                   background: "none",
                   border: "none",
@@ -500,6 +506,7 @@ export default function HomePage() {
 
             {/* Divider */}
             <div
+              className="search-bar-divider"
               style={{
                 width: 1,
                 height: 24,
@@ -534,6 +541,7 @@ export default function HomePage() {
           {/* ── SUGGESTIONS DROPDOWN ── */}
           {showSuggestions && suggestions.length > 0 && (
             <div
+              className="search-suggestions"
               style={{
                 position: "absolute",
                 top: "calc(100% + 4px)",
@@ -556,6 +564,7 @@ export default function HomePage() {
                   }}
                   onMouseEnter={() => setActiveSuggestion(i)}
                   onMouseLeave={() => setActiveSuggestion(-1)}
+                  className={`search-suggestion-row${activeSuggestion === i ? " active" : ""}`}
                   style={{
                     padding: "11px 16px",
                     fontSize: 14,
