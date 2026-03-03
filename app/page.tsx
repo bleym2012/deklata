@@ -341,7 +341,7 @@ export default function HomePage() {
       <div
         style={{
           overflow: "hidden",
-          maxHeight: bannerVisible ? 120 : 0,
+          maxHeight: bannerVisible ? 200 : 0,
           opacity: bannerVisible ? 1 : 0,
           transition: "max-height 0.35s ease, opacity 0.3s ease",
           marginBottom: bannerVisible ? 0 : 0,
