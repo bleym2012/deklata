@@ -94,7 +94,7 @@ export default function ItemDetailsPage() {
       }
       return;
     }
-    if (item?.is_locked) return;
+
     setRequesting(true);
 
     // Get a FRESH session token NOW — before any other async work.
