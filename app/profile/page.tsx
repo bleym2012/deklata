@@ -192,7 +192,7 @@ export default function ProfilePage() {
           marginTop: 24,
           background: "var(--white)",
           borderRadius: 20,
-          padding: 32,
+          padding: "24px 20px",
           boxShadow: "var(--shadow-card)",
           border: "1px solid var(--ink-100)",
         }}
@@ -217,13 +217,15 @@ export default function ProfilePage() {
             {profile?.name?.charAt(0)?.toUpperCase() || "U"}
           </div>
 
-          <div>
+          <div style={{ minWidth: 0, flex: 1 }}>
             <h1
               style={{
                 fontSize: 26,
                 margin: 0,
                 color: "var(--ink-900)",
                 fontFamily: "var(--font-display)",
+                wordBreak: "break-word",
+                overflowWrap: "break-word",
               }}
             >
               {profile?.name}
@@ -233,6 +235,7 @@ export default function ProfilePage() {
                 color: "var(--ink-500)",
                 marginTop: 4,
                 fontFamily: "var(--font-body)",
+                wordBreak: "break-word",
               }}
             >
               {profile?.campus}
