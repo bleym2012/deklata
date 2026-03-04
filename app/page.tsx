@@ -747,7 +747,10 @@ export default function HomePage() {
       <div className="item-grid">
         {items.map((item) => {
           const isOwner = userId === item.owner_id;
-          const isRequested = !!userId && item.is_locked;
+
+          // Grey out only for logged-in non-owners when item is locked.
+          // Not-logged-in users see everything as clickable.
+          const isRequested = !!userId && !isOwner && item.is_locked;
           const hasImage = item.item_images?.length > 0;
           return (
             <div
