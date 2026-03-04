@@ -336,13 +336,15 @@ export default function Footer() {
             gap: 10,
             justifyContent: "space-between",
             fontSize: 12,
-            color: "rgba(255,255,255,0.5)",
+            color: "rgba(255,255,255,0.7)",
           }}
         >
-          <span>
+          <span style={{ color: "rgba(255,255,255,0.7)" }}>
             © {new Date().getFullYear()} Deklata. All rights reserved.
           </span>
-          <span>Made with ❤️ for Ghanaian students</span>
+          <span style={{ color: "rgba(255,255,255,0.7)" }}>
+            Made with ❤️ for Ghanaian students
+          </span>
         </div>
       </div>
     </footer>
