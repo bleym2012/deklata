@@ -416,7 +416,7 @@ export default function HomePage() {
           position: "sticky",
           top: 64,
           zIndex: 50,
-          background: "rgba(250,249,246,0.95)",
+          background: "var(--background, rgba(250,249,246,0.95))",
           backdropFilter: "blur(10px)",
           WebkitBackdropFilter: "blur(10px)",
           paddingTop: 16,

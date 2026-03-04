@@ -58,7 +58,7 @@ export default function Footer() {
                 fontSize: 22,
                 fontWeight: 800,
                 marginBottom: 10,
-                color: "var(--white)",
+                color: "#ffffff",
                 fontFamily: "var(--font-display)",
                 letterSpacing: "-0.03em",
               }}
