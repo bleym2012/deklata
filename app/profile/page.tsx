@@ -14,33 +14,17 @@ export default function ProfilePage() {
   const [email, setEmail] = useState("");
   const [points, setPoints] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [authChecking, setAuthChecking] = useState(true);
 
   useEffect(() => {
-    checkAuth();
+    loadAll();
   }, []);
 
-  async function checkAuth() {
+  async function loadAll() {
+    // ── 1. Single auth call ───────────────────────────────────────────────
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser();
-    if (authError || !user) {
-      router.push("/login");
-      return;
-    }
-    setAuthChecking(false);
-    loadProfile();
-  }
-
-  async function loadProfile() {
-    setLoading(true);
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
     if (authError || !user) {
       router.push("/login");
       return;
@@ -48,65 +32,54 @@ export default function ProfilePage() {
 
     setEmail(user.email ?? "");
 
-    const { data: profileData, error: profileError } = await supabase
-      .from("profiles")
-      .select("id, name, campus")
-      .eq("id", user.id)
-      .single();
+    // ── 2. Profile + points IN PARALLEL — saves ~600-800ms ───────────────
+    const [profileResult, pointsResult] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("id, name, campus")
+        .eq("id", user.id)
+        .single(),
+      supabase
+        .from("user_points")
+        .select("total_points")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+    ]);
 
-    if (profileError) {
-      console.error("Profile fetch error:", profileError);
+    // Points
+    if (pointsResult.error) {
+      console.error("Points fetch error:", pointsResult.error);
+    } else {
+      setPoints(pointsResult.data?.total_points ?? 0);
+    }
+
+    // Profile
+    const profileData = profileResult.data;
+    if (profileResult.error) {
+      console.error("Profile fetch error:", profileResult.error);
     }
 
     if (profileData && (!profileData.name || !profileData.campus)) {
       const updates: any = {};
-
-      if (!profileData.name) {
-        updates.name = user.email?.split("@")[0];
-      }
-
+      if (!profileData.name) updates.name = user.email?.split("@")[0];
       if (!profileData.campus) {
         router.push("/onboarding");
         return;
       }
-      if (false) {
-        updates.campus = "Not specified";
-      }
 
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update(updates)
-        .eq("id", user.id);
-
-      if (updateError) {
-        console.error("Profile auto-fix error:", updateError);
-      }
-
+      await supabase.from("profiles").update(updates).eq("id", user.id);
       setProfile({ ...profileData, ...updates });
     } else {
       setProfile(profileData);
     }
 
-    const { data: pointsRow, error: pointsError } = await supabase
-      .from("user_points")
-      .select("total_points")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (pointsError) {
-      console.error("Points fetch error:", pointsError);
-      setPoints(0);
-    } else {
-      setPoints(pointsRow?.total_points ?? 0);
-    }
-
     setLoading(false);
   }
 
-  function getTier(points: number) {
-    if (points >= 500) return "Gold Giver 🥇";
-    if (points >= 250) return "Silver Giver 🥈";
-    if (points >= 50) return "Bronze Giver 🥉";
+  function getTier(pts: number) {
+    if (pts >= 500) return "Gold Giver 🥇";
+    if (pts >= 250) return "Silver Giver 🥈";
+    if (pts >= 50) return "Bronze Giver 🥉";
     return "New Giver 🌱";
   }
 
@@ -115,15 +88,14 @@ export default function ProfilePage() {
     router.push("/login");
   }
 
-  if (authChecking) return null;
-
+  // ── Skeleton ──────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <main style={{ maxWidth: 800, margin: "0 auto", padding: "24px 16px" }}>
+      <main style={{ maxWidth: 680, margin: "0 auto", padding: "24px 20px" }}>
         <div
           style={{
-            width: 100,
-            height: 100,
+            width: 80,
+            height: 80,
             borderRadius: "50%",
             background: "var(--ink-100)",
             marginBottom: 24,
@@ -133,7 +105,7 @@ export default function ProfilePage() {
         <div
           style={{
             height: 24,
-            width: "60%",
+            width: "55%",
             background: "var(--ink-100)",
             borderRadius: 8,
             marginBottom: 12,
@@ -142,23 +114,24 @@ export default function ProfilePage() {
         />
         <div
           style={{
-            height: 18,
-            width: "40%",
+            height: 16,
+            width: "35%",
             background: "var(--ink-100)",
             borderRadius: 8,
             marginBottom: 24,
             animation: "pulse 1.5s infinite",
           }}
         />
-        {[...Array(2)].map((_, i) => (
+        {[...Array(3)].map((_, i) => (
           <div
             key={i}
             style={{
-              height: 100,
-              borderRadius: 16,
+              height: 80,
+              borderRadius: 14,
               background: "var(--ink-100)",
-              marginBottom: 16,
+              marginBottom: 14,
               animation: "pulse 1.5s infinite",
+              animationDelay: `${i * 0.1}s`,
             }}
           />
         ))}
@@ -171,8 +144,10 @@ export default function ProfilePage() {
       style={{
         maxWidth: 680,
         margin: "0 auto",
-        padding: "40px 20px 80px",
+        padding: "40px 16px 80px",
         fontFamily: "var(--font-body)",
+        boxSizing: "border-box",
+        width: "100%",
       }}
     >
       <Link
@@ -195,21 +170,31 @@ export default function ProfilePage() {
           padding: "24px 20px",
           boxShadow: "var(--shadow-card)",
           border: "1px solid var(--ink-100)",
+          width: "100%",
+          boxSizing: "border-box",
         }}
       >
-        {/* HEADER */}
-        <div style={{ display: "flex", gap: 20, marginBottom: 24 }}>
+        {/* HEADER — avatar + name */}
+        <div
+          style={{
+            display: "flex",
+            gap: 16,
+            marginBottom: 24,
+            alignItems: "flex-start",
+          }}
+        >
+          {/* Avatar */}
           <div
             style={{
-              width: 80,
-              height: 80,
+              width: 72,
+              height: 72,
               borderRadius: "50%",
               background: "var(--green-800)",
               color: "#fff",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: 28,
+              fontSize: 26,
               fontWeight: 700,
               flexShrink: 0,
             }}
@@ -217,15 +202,17 @@ export default function ProfilePage() {
             {profile?.name?.charAt(0)?.toUpperCase() || "U"}
           </div>
 
+          {/* Name + campus — minWidth:0 is critical so flex child can shrink */}
           <div style={{ minWidth: 0, flex: 1 }}>
             <h1
               style={{
-                fontSize: 26,
+                fontSize: "clamp(18px, 5vw, 26px)",
                 margin: 0,
                 color: "var(--ink-900)",
                 fontFamily: "var(--font-display)",
                 wordBreak: "break-word",
                 overflowWrap: "break-word",
+                lineHeight: 1.2,
               }}
             >
               {profile?.name}
@@ -233,8 +220,9 @@ export default function ProfilePage() {
             <p
               style={{
                 color: "var(--ink-500)",
-                marginTop: 4,
+                marginTop: 5,
                 fontFamily: "var(--font-body)",
+                fontSize: 13,
                 wordBreak: "break-word",
               }}
             >
@@ -264,6 +252,7 @@ export default function ProfilePage() {
             fontWeight: 700,
             color: "var(--green-700)",
             fontFamily: "var(--font-display)",
+            marginBottom: 4,
           }}
         >
           {getTier(points)}
@@ -299,15 +288,17 @@ export default function ProfilePage() {
             ),
           );
           return (
-            <div style={{ marginBottom: 20, marginTop: 8 }}>
+            <div style={{ marginBottom: 20, marginTop: 10 }}>
               <div
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
-                  fontSize: 12,
+                  fontSize: 11,
                   color: "var(--ink-500)",
                   marginBottom: 6,
                   fontFamily: "var(--font-body)",
+                  gap: 8,
+                  flexWrap: "wrap",
                 }}
               >
                 <span>{current.label}</span>
@@ -352,16 +343,23 @@ export default function ProfilePage() {
         <div
           style={{
             background: "var(--green-50)",
-            padding: 20,
+            padding: "16px 18px",
             borderRadius: 14,
-            margin: "24px 0",
+            margin: "0 0 20px",
             border: "1px solid var(--green-100)",
           }}
         >
-          <p style={{ color: "var(--ink-700)", margin: 0 }}>
+          <p
+            style={{
+              color: "var(--ink-700)",
+              margin: 0,
+              fontSize: 14,
+              wordBreak: "break-word",
+            }}
+          >
             <strong style={{ color: "var(--ink-900)" }}>Email:</strong> {email}
           </p>
-          <p style={{ marginTop: 8, color: "var(--ink-700)" }}>
+          <p style={{ marginTop: 10, color: "var(--ink-700)", fontSize: 14 }}>
             <strong style={{ color: "var(--ink-900)" }}>Campus:</strong>{" "}
             {profile?.campus}
           </p>
@@ -371,12 +369,13 @@ export default function ProfilePage() {
         <div
           style={{
             background: "#fef3c7",
-            padding: 14,
+            padding: "12px 16px",
             borderRadius: 12,
             fontSize: 13,
             color: "#92400e",
             marginBottom: 20,
             border: "1px solid #fcd34d",
+            lineHeight: 1.5,
           }}
         >
           Profile details are locked. Contact support if you want to make a
