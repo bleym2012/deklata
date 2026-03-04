@@ -166,6 +166,9 @@ export default function HomePage() {
   const [items, setItems] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
+  const [myRequestedItemIds, setMyRequestedItemIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   const [showCategories, setShowCategories] = useState(false);
@@ -288,8 +291,19 @@ export default function HomePage() {
           setTotalCount(count || 0);
           setLoading(false);
         }
-        supabase.auth.getUser().then(({ data }) => {
-          if (!cancelled && data?.user) setUserId(data.user.id);
+        supabase.auth.getUser().then(async ({ data }) => {
+          if (!cancelled && data?.user) {
+            setUserId(data.user.id);
+            // Fetch item IDs this user has active pending requests on
+            const { data: myReqs } = await supabase
+              .from("requests")
+              .select("item_id")
+              .eq("requester_id", data.user.id)
+              .eq("status", "pending");
+            if (!cancelled && myReqs) {
+              setMyRequestedItemIds(new Set(myReqs.map((r: any) => r.item_id)));
+            }
+          }
         });
       } catch (err) {
         console.error(err);
@@ -416,7 +430,7 @@ export default function HomePage() {
           position: "sticky",
           top: 64,
           zIndex: 50,
-          background: "var(--background, rgba(250,249,246,0.95))",
+          background: "rgba(250,249,246,0.95)",
           backdropFilter: "blur(10px)",
           WebkitBackdropFilter: "blur(10px)",
           paddingTop: 16,
@@ -575,9 +589,7 @@ export default function HomePage() {
                     alignItems: "center",
                     gap: 10,
                     background:
-                      activeSuggestion === i
-                        ? "var(--green-50)"
-                        : "var(--white)",
+                      activeSuggestion === i ? "var(--green-50)" : "#fff",
                     borderBottom:
                       i < suggestions.length - 1
                         ? "1px solid var(--ink-100)"
@@ -747,10 +759,12 @@ export default function HomePage() {
       <div className="item-grid">
         {items.map((item) => {
           const isOwner = userId === item.owner_id;
-
-          // Grey out only for logged-in non-owners when item is locked.
-          // Not-logged-in users see everything as clickable.
-          const isRequested = !!userId && !isOwner && item.is_locked;
+          // Only grey/block the item for non-owners when locked.
+          // Logged-in users (including ex-requesters) can always click through
+          // to the item detail page which shows the real current state.
+          // Anonymous visitors see locked items as unclickable.
+          const isRequested =
+            !!userId && !isOwner && myRequestedItemIds.has(item.id);
           const hasImage = item.item_images?.length > 0;
           return (
             <div
