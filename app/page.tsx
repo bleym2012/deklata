@@ -575,7 +575,9 @@ export default function HomePage() {
                     alignItems: "center",
                     gap: 10,
                     background:
-                      activeSuggestion === i ? "var(--green-50)" : "#fff",
+                      activeSuggestion === i
+                        ? "var(--green-50)"
+                        : "var(--white)",
                     borderBottom:
                       i < suggestions.length - 1
                         ? "1px solid var(--ink-100)"
