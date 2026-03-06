@@ -130,7 +130,7 @@ export default function MyRequestsPage() {
       style={{
         maxWidth: 860,
         margin: "0 auto",
-        padding: "32px 20px",
+        padding: "24px 16px",
         fontFamily: "var(--font-body)",
       }}
     >
@@ -150,7 +150,7 @@ export default function MyRequestsPage() {
 
       <h1
         style={{
-          fontSize: 28,
+          fontSize: "clamp(22px, 5vw, 28px)",
           fontWeight: 800,
           marginBottom: 6,
           fontFamily: "var(--font-display)",
@@ -283,7 +283,7 @@ export default function MyRequestsPage() {
                       padding: "8px 16px",
                       borderRadius: 10,
                       border: "1.5px solid #fecaca",
-                      background: "#fff",
+                      background: "var(--white)",
                       color: "#dc2626",
                       fontWeight: 600,
                       cursor: "pointer",
