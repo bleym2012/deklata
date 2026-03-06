@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabaseClient";
 
-type Category = { id: string; name: string; };
+type Category = { id: string; name: string };
 
 export default function AddItemPage() {
   const router = useRouter();
@@ -22,25 +22,44 @@ export default function AddItemPage() {
   const [error, setError] = useState<string | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
 
-  useEffect(() => { checkUser(); }, []);
+  useEffect(() => {
+    checkUser();
+  }, []);
 
   async function checkUser() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.push("/login"); return; }
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      router.push("/login");
+      return;
+    }
 
     // Check campus and phone
     const { data: profile } = await supabase
-      .from("profiles").select("campus, phone").eq("id", user.id).single();
-    const noCampus = !profile?.campus || profile.campus === "Not specified" || profile.campus.trim() === "";
+      .from("profiles")
+      .select("campus, phone")
+      .eq("id", user.id)
+      .single();
+    const noCampus =
+      !profile?.campus ||
+      profile.campus === "Not specified" ||
+      profile.campus.trim() === "";
     const noPhone = !profile?.phone || profile.phone.trim() === "";
-    if (noCampus || noPhone) { router.push("/onboarding"); return; }
+    if (noCampus || noPhone) {
+      router.push("/onboarding");
+      return;
+    }
 
     setAuthChecking(false);
     loadCategories();
   }
 
   async function loadCategories() {
-    const { data, error } = await supabase.from("categories").select("id, name").order("name", { ascending: true });
+    const { data, error } = await supabase
+      .from("categories")
+      .select("id, name")
+      .order("name", { ascending: true });
     if (!error && data) setCategories(data);
   }
 
@@ -49,7 +68,10 @@ export default function AddItemPage() {
       const MAX_SIZE = 1024 * 1024; // 1MB target
       const MAX_DIM = 1400;
 
-      if (file.size <= MAX_SIZE) { resolve(file); return; }
+      if (file.size <= MAX_SIZE) {
+        resolve(file);
+        return;
+      }
 
       const img = new Image();
       const url = URL.createObjectURL(file);
@@ -66,16 +88,32 @@ export default function AddItemPage() {
         canvas.height = height;
         const ctx = canvas.getContext("2d")!;
         ctx.drawImage(img, 0, 0, width, height);
-        canvas.toBlob((blob1) => {
-          if (blob1 && blob1.size <= MAX_SIZE) {
-            resolve(new File([blob1], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" }));
-          } else {
-            canvas.toBlob((blob2) => {
-              const final = blob2 || blob1 || file;
-              resolve(new File([final], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" }));
-            }, "image/jpeg", 0.65);
-          }
-        }, "image/jpeg", 0.82);
+        canvas.toBlob(
+          (blob1) => {
+            if (blob1 && blob1.size <= MAX_SIZE) {
+              resolve(
+                new File([blob1], file.name.replace(/\.[^.]+$/, ".jpg"), {
+                  type: "image/jpeg",
+                }),
+              );
+            } else {
+              canvas.toBlob(
+                (blob2) => {
+                  const final = blob2 || blob1 || file;
+                  resolve(
+                    new File([final], file.name.replace(/\.[^.]+$/, ".jpg"), {
+                      type: "image/jpeg",
+                    }),
+                  );
+                },
+                "image/jpeg",
+                0.65,
+              );
+            }
+          },
+          "image/jpeg",
+          0.82,
+        );
       };
       img.onerror = () => resolve(file);
       img.src = url;
@@ -104,25 +142,59 @@ export default function AddItemPage() {
     setLoading(true);
     setError(null);
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setError("You must be logged in"); setLoading(false); return; }
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setError("You must be logged in");
+      setLoading(false);
+      return;
+    }
 
-    const { data: profile, error: profileError } = await supabase.from("profiles").select("campus").eq("id", user.id).single();
-    if (profileError) { console.error("Failed to fetch user campus", profileError); return; }
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("campus")
+      .eq("id", user.id)
+      .single();
+    if (profileError) {
+      console.error("Failed to fetch user campus", profileError);
+      return;
+    }
 
-    const { data: item, error: itemError } = await supabase.from("items")
-      .insert({ owner_id: user.id, name, description, category_id: categoryId, category_name: categoryName, pickup_location: pickupLocation, campus: profile?.campus ?? null, condition })
-      .select().single();
+    const { data: item, error: itemError } = await supabase
+      .from("items")
+      .insert({
+        owner_id: user.id,
+        name,
+        description,
+        category_id: categoryId,
+        category_name: categoryName,
+        pickup_location: pickupLocation,
+        campus: profile?.campus ?? null,
+        condition,
+      })
+      .select()
+      .single();
 
-    if (itemError || !item) { setError(itemError?.message || "Failed to create item"); setLoading(false); return; }
+    if (itemError || !item) {
+      setError(itemError?.message || "Failed to create item");
+      setLoading(false);
+      return;
+    }
 
     for (const image of images) {
       const ext = image.name.split(".").pop()?.toLowerCase() || "jpg";
       const filePath = `${item.id}/${crypto.randomUUID()}.${ext}`;
-      const { error: uploadError } = await supabase.storage.from("item-images").upload(filePath, image, { contentType: image.type, upsert: false });
+      const { error: uploadError } = await supabase.storage
+        .from("item-images")
+        .upload(filePath, image, { contentType: image.type, upsert: false });
       if (uploadError) continue;
-      const publicUrl = supabase.storage.from("item-images").getPublicUrl(filePath).data.publicUrl;
-      await supabase.from("item_images").insert({ item_id: item.id, image_url: publicUrl });
+      const publicUrl = supabase.storage
+        .from("item-images")
+        .getPublicUrl(filePath).data.publicUrl;
+      await supabase
+        .from("item_images")
+        .insert({ item_id: item.id, image_url: publicUrl });
     }
 
     router.push("/");
@@ -131,24 +203,40 @@ export default function AddItemPage() {
   if (authChecking) return null;
 
   return (
-    <main style={{ maxWidth: 580, margin: "40px auto", padding: "0 20px 60px" }}>
+    <main
+      style={{
+        maxWidth: 580,
+        margin: "clamp(16px, 4vw, 40px) auto",
+        padding: "0 20px 60px",
+      }}
+    >
       {/* HEADER */}
       <div style={{ marginBottom: 32 }}>
-        <h1 style={{ fontSize: 30, marginBottom: 6 }}>Give an item away</h1>
-        <p style={{ color: "var(--ink-500)", fontSize: 15, margin: 0, fontFamily: "var(--font-body)" }}>
+        <h1 style={{ fontSize: "clamp(22px, 5vw, 30px)", marginBottom: 6 }}>
+          Give an item away
+        </h1>
+        <p
+          style={{
+            color: "var(--ink-500)",
+            fontSize: 15,
+            margin: 0,
+            fontFamily: "var(--font-body)",
+          }}
+        >
           List something you no longer need and help a fellow student today.
         </p>
       </div>
 
-      <div style={{
-        background: "var(--white)",
-        borderRadius: "var(--radius-xl)",
-        padding: "32px",
-        border: "1px solid var(--ink-100)",
-        boxShadow: "var(--shadow-card)",
-      }}>
+      <div
+        style={{
+          background: "var(--white)",
+          borderRadius: "var(--radius-xl)",
+          padding: "clamp(18px, 4vw, 32px)",
+          border: "1px solid var(--ink-100)",
+          boxShadow: "var(--shadow-card)",
+        }}
+      >
         <form onSubmit={handleSubmit} style={{ display: "grid", gap: 18 }}>
-
           <div>
             <label style={labelStyle}>Item name</label>
             <input
@@ -159,7 +247,15 @@ export default function AddItemPage() {
               maxLength={80}
               className="form-input"
             />
-            <p style={{ fontSize: 11, color: name.length > 70 ? "#dc2626" : "var(--ink-300)", marginTop: 4, textAlign: "right", fontFamily: "var(--font-body)" }}>
+            <p
+              style={{
+                fontSize: 11,
+                color: name.length > 70 ? "#dc2626" : "var(--ink-300)",
+                marginTop: 4,
+                textAlign: "right",
+                fontFamily: "var(--font-body)",
+              }}
+            >
               {name.length}/80
             </p>
           </div>
@@ -176,7 +272,15 @@ export default function AddItemPage() {
               className="form-input"
               style={{ resize: "vertical" }}
             />
-            <p style={{ fontSize: 11, color: description.length > 450 ? "#dc2626" : "var(--ink-300)", marginTop: 4, textAlign: "right", fontFamily: "var(--font-body)" }}>
+            <p
+              style={{
+                fontSize: 11,
+                color: description.length > 450 ? "#dc2626" : "var(--ink-300)",
+                marginTop: 4,
+                textAlign: "right",
+                fontFamily: "var(--font-body)",
+              }}
+            >
               {description.length}/500
             </p>
           </div>
@@ -195,7 +299,9 @@ export default function AddItemPage() {
             >
               <option value="">Select a category</option>
               {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>{cat.name}</option>
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
+                </option>
               ))}
             </select>
           </div>
@@ -210,10 +316,16 @@ export default function AddItemPage() {
             >
               <option value="">Select condition</option>
               <option value="Brand new">Brand new — unused/unopened</option>
-              <option value="Excellent">Excellent — like new, barely used</option>
+              <option value="Excellent">
+                Excellent — like new, barely used
+              </option>
               <option value="Good">Good — works perfectly, minor wear</option>
-              <option value="Fair">Fair — functional with visible signs of use</option>
-              <option value="For parts">For parts — broken or incomplete</option>
+              <option value="Fair">
+                Fair — functional with visible signs of use
+              </option>
+              <option value="For parts">
+                For parts — broken or incomplete
+              </option>
             </select>
           </div>
 
@@ -230,7 +342,12 @@ export default function AddItemPage() {
 
           {/* IMAGE UPLOAD */}
           <div>
-            <label style={labelStyle}>Photos <span style={{ color: "var(--ink-300)", fontWeight: 400 }}>(optional, max 3)</span></label>
+            <label style={labelStyle}>
+              Photos{" "}
+              <span style={{ color: "var(--ink-300)", fontWeight: 400 }}>
+                (optional, max 3)
+              </span>
+            </label>
 
             <input
               key={fileInputKey}
@@ -239,7 +356,9 @@ export default function AddItemPage() {
               accept="image/*"
               multiple
               style={{ display: "none" }}
-              onChange={(e) => e.target.files && handleImageSelect(e.target.files)}
+              onChange={(e) =>
+                e.target.files && handleImageSelect(e.target.files)
+              }
             />
 
             <button
@@ -267,13 +386,26 @@ export default function AddItemPage() {
             </button>
 
             {previewUrls.length > 0 && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginTop: 14 }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: 12,
+                  marginTop: 14,
+                }}
+              >
                 {previewUrls.map((url, index) => (
                   <div key={url} style={{ position: "relative" }}>
                     <img
                       src={url}
                       alt=""
-                      style={{ width: "100%", height: 110, objectFit: "cover", borderRadius: 12, boxShadow: "var(--shadow-card)" }}
+                      style={{
+                        width: "100%",
+                        height: 110,
+                        objectFit: "cover",
+                        borderRadius: 12,
+                        boxShadow: "var(--shadow-card)",
+                      }}
                     />
                     <button
                       type="button"
@@ -312,7 +444,14 @@ export default function AddItemPage() {
           </button>
 
           {error && (
-            <p style={{ color: "#dc2626", fontSize: 14, textAlign: "center", fontFamily: "var(--font-body)" }}>
+            <p
+              style={{
+                color: "#dc2626",
+                fontSize: 14,
+                textAlign: "center",
+                fontFamily: "var(--font-body)",
+              }}
+            >
               {error}
             </p>
           )}
