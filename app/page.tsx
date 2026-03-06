@@ -246,9 +246,10 @@ export default function HomePage() {
           .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
         if (q.trim()) {
-          query = query.or(
-            `name.ilike.%${q.trim()}%,description.ilike.%${q.trim()}%,pickup_location.ilike.%${q.trim()}%`,
-          );
+          query = query.textSearch("search_vector", q.trim(), {
+            type: "websearch",
+            config: "english",
+          });
         }
         if (category !== "all") query = query.eq("category_id", category);
         if (selectedCampus !== "all") {
