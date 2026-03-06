@@ -206,7 +206,7 @@ export default function Header() {
           position: "sticky",
           top: 0,
           zIndex: 100,
-          background: "rgba(250,249,246,0.95)",
+          background: "var(--background, rgba(250,249,246,0.95))",
           backdropFilter: "blur(12px)",
           WebkitBackdropFilter: "blur(12px)",
           borderBottom: "1px solid var(--ink-100)",
@@ -240,9 +240,8 @@ export default function Header() {
               <img
                 src="/images/deklata-logo-light.svg"
                 alt="Deklata"
-                width={160}
-                height={40}
-                style={{ display: "block" }}
+                className="deklata-logo"
+                style={{ display: "block", height: 36, width: "auto" }}
               />
             </picture>
           </Link>
@@ -329,7 +328,7 @@ export default function Header() {
               display: "flex",
               flexDirection: "column",
               gap: 6,
-              background: "var(--cream)",
+              background: "var(--background, rgba(250,249,246,0.98))",
               animation: "slideDown 0.18s ease",
             }}
           >
@@ -356,10 +355,21 @@ export default function Header() {
           .hamburger-btn {
             display: none !important;
           }
+          .deklata-logo {
+            height: 40px !important;
+          }
         }
         @media (max-width: 767px) {
           .desktop-nav {
             display: none !important;
+          }
+          .deklata-logo {
+            height: 32px !important;
+          }
+        }
+        @media (max-width: 360px) {
+          .deklata-logo {
+            height: 28px !important;
           }
         }
       `}</style>
