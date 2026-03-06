@@ -246,7 +246,7 @@ export default function OwnerDashboard() {
       style={{
         maxWidth: 900,
         margin: "0 auto",
-        padding: "32px 20px",
+        padding: "24px 16px",
         fontFamily: "var(--font-body)",
       }}
     >
@@ -266,7 +266,7 @@ export default function OwnerDashboard() {
 
       <h1
         style={{
-          fontSize: 28,
+          fontSize: "clamp(22px, 5vw, 28px)",
           fontWeight: 800,
           marginBottom: 6,
           fontFamily: "var(--font-display)",
@@ -302,7 +302,7 @@ export default function OwnerDashboard() {
             key={t.key}
             onClick={() => setTab(t.key as any)}
             style={{
-              padding: "10px 20px",
+              padding: "10px clamp(12px, 3vw, 20px)",
               border: "none",
               background: "none",
               cursor: "pointer",
@@ -388,7 +388,7 @@ export default function OwnerDashboard() {
                     style={{
                       background: "var(--white)",
                       borderRadius: 16,
-                      padding: 20,
+                      padding: "clamp(14px, 3vw, 20px)",
                       boxShadow: "var(--shadow-card)",
                       border: "1px solid var(--ink-100)",
                       borderLeft:
@@ -481,7 +481,7 @@ export default function OwnerDashboard() {
                               padding: "11px",
                               borderRadius: 12,
                               border: "1.5px solid #dc2626",
-                              background: "#fff",
+                              background: "var(--white)",
                               color: "#dc2626",
                               fontWeight: 700,
                               cursor: "pointer",
@@ -516,22 +516,29 @@ export default function OwnerDashboard() {
                           >
                             ✅ Request approved — contact details below
                           </p>
-                          <p
+                          <div
                             style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 6,
                               fontSize: 14,
                               color: "var(--ink-700)",
-                              margin: 0,
                             }}
                           >
-                            <strong>Name:</strong>{" "}
-                            {profiles[req.requester_id].name}
-                            <br />
-                            <strong>Phone:</strong>{" "}
-                            {profiles[req.requester_id].phone || "Not provided"}
-                            <br />
-                            <strong>Campus:</strong>{" "}
-                            {profiles[req.requester_id].campus || "—"}
-                          </p>
+                            <p style={{ margin: 0 }}>
+                              <strong>Name:</strong>{" "}
+                              {profiles[req.requester_id].name}
+                            </p>
+                            <p style={{ margin: 0 }}>
+                              <strong>Phone:</strong>{" "}
+                              {profiles[req.requester_id].phone ||
+                                "Not provided"}
+                            </p>
+                            <p style={{ margin: 0 }}>
+                              <strong>Campus:</strong>{" "}
+                              {profiles[req.requester_id].campus || "—"}
+                            </p>
+                          </div>
                           {req.owner_confirmed !== true ? (
                             <button
                               onClick={() => confirmOwnerGiven(req.id)}
