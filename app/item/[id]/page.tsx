@@ -184,7 +184,7 @@ export default function ItemDetailsPage() {
 
   if (loading || !item) {
     return (
-      <main style={{ maxWidth: 1140, margin: "0 auto", padding: "32px 20px" }}>
+      <main style={{ maxWidth: 1140, margin: "0 auto", padding: "24px 16px" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 32 }}>
           <div
             className="skeleton"
@@ -270,7 +270,7 @@ export default function ItemDetailsPage() {
             display: "flex",
             alignItems: "center",
             gap: 6,
-            padding: 0,
+            padding: "8px 0",
           }}
         >
           ← Back to results
@@ -385,7 +385,7 @@ export default function ItemDetailsPage() {
             style={{
               background: "var(--white)",
               borderRadius: 20,
-              padding: "24px",
+              padding: "clamp(16px, 4vw, 24px)",
               boxShadow: "var(--shadow-card)",
               border: "1px solid var(--ink-100)",
             }}
@@ -409,7 +409,7 @@ export default function ItemDetailsPage() {
 
             <h1
               style={{
-                fontSize: 26,
+                fontSize: "clamp(20px, 5vw, 26px)",
                 fontWeight: 800,
                 marginBottom: 8,
                 lineHeight: 1.2,
