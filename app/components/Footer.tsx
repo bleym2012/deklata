@@ -68,7 +68,7 @@ export default function Footer() {
             <p
               style={{
                 fontSize: 14,
-                color: "rgba(255,255,255,0.55)",
+                color: "rgba(255,255,255,0.75)",
                 lineHeight: 1.7,
                 margin: 0,
               }}
@@ -110,7 +110,7 @@ export default function Footer() {
                     height: 36,
                     borderRadius: 10,
                     background: "rgba(255,255,255,0.08)",
-                    color: "rgba(255,255,255,0.6)",
+                    color: "rgba(255,255,255,0.85)",
                     transition: "all 0.2s ease",
                     textDecoration: "none",
                   }}
@@ -129,7 +129,7 @@ export default function Footer() {
                   fontSize: 11,
                   fontWeight: 700,
                   marginBottom: 12,
-                  color: "rgba(255,255,255,0.35)",
+                  color: "rgba(255,255,255,0.55)",
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
                 }}
@@ -155,7 +155,7 @@ export default function Footer() {
                       href={l.href}
                       style={{
                         fontSize: 14,
-                        color: "rgba(255,255,255,0.55)",
+                        color: "rgba(255,255,255,0.8)",
                         textDecoration: "none",
                       }}
                     >
@@ -172,7 +172,7 @@ export default function Footer() {
                   fontSize: 11,
                   fontWeight: 700,
                   marginBottom: 12,
-                  color: "rgba(255,255,255,0.35)",
+                  color: "rgba(255,255,255,0.55)",
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
                 }}
@@ -197,7 +197,7 @@ export default function Footer() {
                             href="/login"
                             style={{
                               fontSize: 14,
-                              color: "rgba(255,255,255,0.55)",
+                              color: "rgba(255,255,255,0.8)",
                               textDecoration: "none",
                             }}
                           >
@@ -209,7 +209,7 @@ export default function Footer() {
                             href="/register"
                             style={{
                               fontSize: 14,
-                              color: "rgba(255,255,255,0.55)",
+                              color: "rgba(255,255,255,0.8)",
                               textDecoration: "none",
                             }}
                           >
@@ -225,7 +225,7 @@ export default function Footer() {
                             href="/dashboard"
                             style={{
                               fontSize: 14,
-                              color: "rgba(255,255,255,0.55)",
+                              color: "rgba(255,255,255,0.8)",
                               textDecoration: "none",
                             }}
                           >
@@ -237,7 +237,7 @@ export default function Footer() {
                             href="/my-requests"
                             style={{
                               fontSize: 14,
-                              color: "rgba(255,255,255,0.55)",
+                              color: "rgba(255,255,255,0.8)",
                               textDecoration: "none",
                             }}
                           >
@@ -249,7 +249,7 @@ export default function Footer() {
                             href="/profile"
                             style={{
                               fontSize: 14,
-                              color: "rgba(255,255,255,0.55)",
+                              color: "rgba(255,255,255,0.8)",
                               textDecoration: "none",
                             }}
                           >
@@ -269,7 +269,7 @@ export default function Footer() {
                   fontSize: 11,
                   fontWeight: 700,
                   marginBottom: 12,
-                  color: "rgba(255,255,255,0.35)",
+                  color: "rgba(255,255,255,0.55)",
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
                 }}
@@ -290,7 +290,7 @@ export default function Footer() {
                     href="/terms"
                     style={{
                       fontSize: 14,
-                      color: "rgba(255,255,255,0.55)",
+                      color: "rgba(255,255,255,0.8)",
                       textDecoration: "none",
                     }}
                   >
@@ -302,7 +302,7 @@ export default function Footer() {
                     href="/guidelines"
                     style={{
                       fontSize: 14,
-                      color: "rgba(255,255,255,0.55)",
+                      color: "rgba(255,255,255,0.8)",
                       textDecoration: "none",
                     }}
                   >
@@ -314,7 +314,7 @@ export default function Footer() {
                     href="/contact"
                     style={{
                       fontSize: 14,
-                      color: "rgba(255,255,255,0.55)",
+                      color: "rgba(255,255,255,0.8)",
                       textDecoration: "none",
                     }}
                   >
@@ -336,13 +336,13 @@ export default function Footer() {
             gap: 10,
             justifyContent: "space-between",
             fontSize: 12,
-            color: "rgba(255,255,255,0.7)",
+            color: "rgba(255,255,255,0.85)",
           }}
         >
-          <span style={{ color: "rgba(255,255,255,0.7)" }}>
+          <span style={{ color: "rgba(255,255,255,0.85)" }}>
             © {new Date().getFullYear()} Deklata. All rights reserved.
           </span>
-          <span style={{ color: "rgba(255,255,255,0.7)" }}>
+          <span style={{ color: "rgba(255,255,255,0.85)" }}>
             Made with ❤️ for Ghanaian students
           </span>
         </div>
