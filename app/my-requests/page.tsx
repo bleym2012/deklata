@@ -120,8 +120,28 @@ export default function MyRequestsPage() {
     loadMyRequests();
   }
 
-  if (authChecking) return null;
-
+  if (authChecking)
+    return (
+      <main style={{ maxWidth: 860, margin: "0 auto", padding: "24px 16px" }}>
+        <div
+          className="skeleton"
+          style={{ height: 32, width: "35%", marginBottom: 16 }}
+        />
+        <div
+          className="skeleton"
+          style={{ height: 20, width: "55%", marginBottom: 28 }}
+        />
+        <div style={{ display: "grid", gap: 16 }}>
+          {[...Array(3)].map((_, i) => (
+            <div
+              key={i}
+              className="skeleton"
+              style={{ height: 140, borderRadius: 16 }}
+            />
+          ))}
+        </div>
+      </main>
+    );
   const pendingRequests = requests.filter((r) => r.status === "pending");
   const approvedRequests = requests.filter((r) => r.status === "approved");
 

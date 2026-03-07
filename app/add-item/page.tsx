@@ -200,7 +200,22 @@ export default function AddItemPage() {
     router.push("/");
   }
 
-  if (authChecking) return null;
+  if (authChecking)
+    return (
+      <main
+        style={{
+          maxWidth: 580,
+          margin: "clamp(16px, 4vw, 40px) auto",
+          padding: "0 20px 60px",
+        }}
+      >
+        <div
+          className="skeleton"
+          style={{ height: 32, width: "40%", marginBottom: 24 }}
+        />
+        <div className="skeleton" style={{ height: 500, borderRadius: 20 }} />
+      </main>
+    );
 
   return (
     <main

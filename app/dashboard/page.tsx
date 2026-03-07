@@ -236,7 +236,28 @@ export default function OwnerDashboard() {
     loadRequests(userId!);
   }
 
-  if (authChecking) return null;
+  if (authChecking)
+    return (
+      <main style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px" }}>
+        <div
+          className="skeleton"
+          style={{ height: 32, width: "30%", marginBottom: 16 }}
+        />
+        <div
+          className="skeleton"
+          style={{ height: 20, width: "50%", marginBottom: 28 }}
+        />
+        <div style={{ display: "grid", gap: 16 }}>
+          {[...Array(3)].map((_, i) => (
+            <div
+              key={i}
+              className="skeleton"
+              style={{ height: 140, borderRadius: 16 }}
+            />
+          ))}
+        </div>
+      </main>
+    );
 
   const pendingCount = requests.filter((r) => r.status === "pending").length;
   const approvedCount = requests.filter((r) => r.status === "approved").length;
