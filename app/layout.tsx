@@ -92,32 +92,63 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en">
       <head>
         {/* Preconnect to Supabase — saves 200-400ms on first DB call */}
-        <link rel="preconnect" href="https://iibknadykycghvbjbwxs.supabase.co" />
-        <link rel="dns-prefetch" href="https://iibknadykycghvbjbwxs.supabase.co" />
+        <link
+          rel="preconnect"
+          href="https://iibknadykycghvbjbwxs.supabase.co"
+        />
+        <link
+          rel="dns-prefetch"
+          href="https://iibknadykycghvbjbwxs.supabase.co"
+        />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
         <link
           href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap"
           rel="stylesheet"
         />
 
         {/* PWA */}
-        <meta name="theme-color" content="#1a5c3a" media="(prefers-color-scheme: light)" />
-        <meta name="theme-color" content="#0d1a12" media="(prefers-color-scheme: dark)" />
+        <meta
+          name="theme-color"
+          content="#1a5c3a"
+          media="(prefers-color-scheme: light)"
+        />
+        <meta
+          name="theme-color"
+          content="#0d1a12"
+          media="(prefers-color-scheme: dark)"
+        />
         <meta name="msapplication-TileColor" content="#1a5c3a" />
         <meta name="msapplication-tap-highlight" content="no" />
         <meta name="mobile-web-app-capable" content="yes" />
-        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
-        <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-96x96.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-72x72.png" />
-        <link rel="manifest" href="/manifest.webmanifest" />
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="32x32"
+          href="/icons/favicon-32x32.png"
+        />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="16x16"
+          href="/icons/favicon-16x16.png"
+        />
+        <link rel="icon" href="/icons/favicon.ico" />
+        <link rel="manifest" href="/icons/site.webmanifest" />
 
         {/* JSON-LD structured data — Organisation */}
         <script
