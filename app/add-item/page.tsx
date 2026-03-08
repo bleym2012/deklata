@@ -43,9 +43,9 @@ export default function AddItemPage() {
       .single();
     const noCampus =
       !profile?.campus ||
-      profile.campus === "Not specified" ||
-      profile.campus.trim() === "";
-    const noPhone = !profile?.phone || profile.phone.trim() === "";
+      profile?.campus === "Not specified" ||
+      profile?.campus.trim() === "";
+    const noPhone = !profile?.phone || profile?.phone.trim() === "";
     if (noCampus || noPhone) {
       router.push("/onboarding");
       return;
