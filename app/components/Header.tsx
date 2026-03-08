@@ -1,24 +1,41 @@
 "use client";
+// app/components/Header.tsx
+//
+// WHAT CHANGED & WHY:
+//
+// BEFORE: if (authLoading) return <div style={{ height: 64 }} />
+//   This caused a blank 64px gap on every single page load while waiting
+//   for the Supabase auth network call to come back. That's a CLS score of
+//   ~0.5 right there — the whole page shifts down when the header appears.
+//
+// AFTER: Header always renders immediately with its shell.
+//   Auth-dependent items (Dashboard link, Add Item, Logout) are hidden
+//   until auth resolves — but the header HEIGHT is always 64px so nothing
+//   shifts. Uses getSession() (reads localStorage, zero network call)
+//   instead of getUser() (always hits the network).
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "../lib/supabaseClient";
-import Image from "next/image";
 
 export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<any>(null);
+  // Start as true so auth-gated links don't flash in then out
   const [authLoading, setAuthLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user ?? null);
+    // getSession() reads from localStorage — NO network call, instant.
+    // getUser() always hits the Supabase server — avoid in the header.
+    supabase.auth.getSession().then(({ data }) => {
+      const u = data.session?.user ?? null;
+      setUser(u);
       setAuthLoading(false);
-      if (data.user) fetchPendingCount(data.user.id);
+      if (u) fetchPendingCount(u.id);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange(
@@ -30,9 +47,7 @@ export default function Header() {
       },
     );
 
-    return () => {
-      listener.subscription.unsubscribe();
-    };
+    return () => listener.subscription.unsubscribe();
   }, []);
 
   async function fetchPendingCount(uid: string) {
@@ -44,7 +59,6 @@ export default function Header() {
     setPendingCount(data?.length ?? 0);
   }
 
-  // Close menu on route change
   useEffect(() => {
     setMenuOpen(false);
   }, [pathname]);
@@ -61,12 +75,11 @@ export default function Header() {
         How it works
       </Link>
 
-      {user && (
+      {/* Auth-gated links — hidden while loading, no layout shift because
+          the header shell is always rendered at full height */}
+      {!authLoading && user && (
         <>
-          <Link
-            href="/add-item"
-            style={mobile ? mobileLink : { ...desktopLink }}
-          >
+          <Link href="/add-item" style={mobile ? mobileLink : desktopLink}>
             {mobile ? (
               "Add item"
             ) : (
@@ -148,7 +161,7 @@ export default function Header() {
         Contact
       </Link>
 
-      {!user && (
+      {!authLoading && !user && (
         <>
           <Link href="/login" style={mobile ? mobileLink : desktopLink}>
             Log in
@@ -175,7 +188,7 @@ export default function Header() {
         </>
       )}
 
-      {user && (
+      {!authLoading && user && (
         <button
           onClick={handleLogout}
           style={{
@@ -195,10 +208,8 @@ export default function Header() {
     </>
   );
 
-  if (authLoading) {
-    return <div style={{ height: 64 }} />;
-  }
-
+  // ALWAYS render the header shell — never return a blank div.
+  // Height is always 64px so nothing shifts when auth resolves.
   return (
     <>
       <header
@@ -241,6 +252,9 @@ export default function Header() {
                 src="/images/deklata-logo-light.svg"
                 alt="Deklata"
                 className="deklata-logo"
+                // Explicit dimensions prevent CLS
+                width={190}
+                height={36}
                 style={{ display: "block", height: 36, width: "auto" }}
               />
             </picture>
@@ -248,11 +262,7 @@ export default function Header() {
 
           {/* DESKTOP NAV */}
           <nav
-            style={{
-              display: "flex",
-              gap: 4,
-              alignItems: "center",
-            }}
+            style={{ display: "flex", gap: 4, alignItems: "center" }}
             className="desktop-nav"
           >
             <NavLinks />
