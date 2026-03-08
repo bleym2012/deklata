@@ -42,10 +42,11 @@ export default function AddItemPage() {
       .eq("id", user.id)
       .single();
     const noCampus =
-      !profile?.campus ||
-      profile?.campus === "Not specified" ||
-      profile?.campus.trim() === "";
-    const noPhone = !profile?.phone || profile?.phone.trim() === "";
+      !profile ||
+      !profile.campus ||
+      profile.campus === "Not specified" ||
+      profile.campus.trim() === "";
+    const noPhone = !profile || !profile.phone || profile.phone.trim() === "";
     if (noCampus || noPhone) {
       router.push("/onboarding");
       return;
@@ -156,8 +157,9 @@ export default function AddItemPage() {
       .select("campus")
       .eq("id", user.id)
       .single();
-    if (profileError) {
+    if (profileError || !profile) {
       console.error("Failed to fetch user campus", profileError);
+      setLoading(false);
       return;
     }
 
