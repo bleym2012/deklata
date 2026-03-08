@@ -36,13 +36,15 @@ export default function AddItemPage() {
     }
 
     // Check campus and phone
-    const { data: profile } = (await supabase
+    const { data: profileData } = await supabase
       .from("profiles")
       .select("campus, phone")
       .eq("id", user.id)
-      .single()) as {
-      data: { campus: string | null; phone: string | null } | null;
-    };
+      .single();
+    const profile = profileData as {
+      campus: string | null;
+      phone: string | null;
+    } | null;
     const noCampus =
       !profile ||
       !profile.campus ||
