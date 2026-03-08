@@ -164,6 +164,15 @@ export default function RootLayout({
         />
         <link rel="icon" href="/icons/favicon.ico" />
         <link rel="manifest" href="/icons/site.webmanifest" />
+        {/* Prevents nav flash on mobile before CSS hydrates */}
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+  @media (max-width: 767px) { .desktop-nav { display: none !important; } }
+  @media (min-width: 768px) { .hamburger-btn { display: none !important; } }
+`,
+          }}
+        />
 
         {/* JSON-LD */}
         <script

@@ -1,18 +1,4 @@
 "use client";
-// app/components/Header.tsx
-//
-// WHAT CHANGED & WHY:
-//
-// BEFORE: if (authLoading) return <div style={{ height: 64 }} />
-//   This caused a blank 64px gap on every single page load while waiting
-//   for the Supabase auth network call to come back. That's a CLS score of
-//   ~0.5 right there — the whole page shifts down when the header appears.
-//
-// AFTER: Header always renders immediately with its shell.
-//   Auth-dependent items (Dashboard link, Add Item, Logout) are hidden
-//   until auth resolves — but the header HEIGHT is always 64px so nothing
-//   shifts. Uses getSession() (reads localStorage, zero network call)
-//   instead of getUser() (always hits the network).
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -23,14 +9,17 @@ export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<any>(null);
-  // Start as true so auth-gated links don't flash in then out
   const [authLoading, setAuthLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+  // mounted = false on server, true after first client render.
+  // We use this to hide nav links until auth state is known,
+  // preventing the "How it works / Contact only" flash.
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    // getSession() reads from localStorage — NO network call, instant.
-    // getUser() always hits the Supabase server — avoid in the header.
+    setMounted(true);
+
     supabase.auth.getSession().then(({ data }) => {
       const u = data.session?.user ?? null;
       setUser(u);
@@ -69,147 +58,149 @@ export default function Header() {
     router.push("/");
   }
 
-  const NavLinks = ({ mobile = false }: { mobile?: boolean }) => (
-    <>
-      <Link href="/how-it-works" style={mobile ? mobileLink : desktopLink}>
-        How it works
-      </Link>
+  // Before mount: render nothing inside nav.
+  // This means server HTML has an empty nav — no links to flash.
+  // After mount: auth resolves within ~1 frame and correct links appear.
+  const NavLinks = ({ mobile = false }: { mobile?: boolean }) => {
+    if (!mounted) return null;
 
-      {/* Auth-gated links — hidden while loading, no layout shift because
-          the header shell is always rendered at full height */}
-      {!authLoading && user && (
-        <>
-          <Link href="/add-item" style={mobile ? mobileLink : desktopLink}>
-            {mobile ? (
-              "Add item"
-            ) : (
-              <span
-                style={{
-                  background: "var(--gold)",
-                  color: "var(--white)",
-                  padding: "7px 16px",
-                  borderRadius: 999,
-                  fontFamily: "var(--font-display)",
-                  fontWeight: 700,
-                  fontSize: 13,
-                  letterSpacing: "0.2px",
-                }}
-              >
-                + Add item
-              </span>
-            )}
-          </Link>
+    return (
+      <>
+        <Link href="/how-it-works" style={mobile ? mobileLink : desktopLink}>
+          How it works
+        </Link>
 
-          <Link
-            href="/dashboard"
-            style={
-              mobile ? mobileLink : { ...desktopLink, position: "relative" }
-            }
-          >
-            Dashboard
-            {pendingCount > 0 && !mobile && (
-              <span
-                style={{
-                  position: "absolute",
-                  top: -4,
-                  right: -4,
-                  background: "var(--gold)",
-                  color: "#fff",
-                  fontSize: 9,
-                  fontWeight: 800,
-                  width: 16,
-                  height: 16,
-                  borderRadius: "50%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontFamily: "var(--font-display)",
-                }}
-              >
-                {pendingCount > 9 ? "9+" : pendingCount}
-              </span>
-            )}
-            {pendingCount > 0 && mobile && (
-              <span
-                style={{
-                  marginLeft: 8,
-                  background: "var(--gold)",
-                  color: "#fff",
-                  fontSize: 10,
-                  fontWeight: 800,
-                  padding: "1px 7px",
-                  borderRadius: 999,
-                  fontFamily: "var(--font-display)",
-                }}
-              >
-                {pendingCount}
-              </span>
-            )}
-          </Link>
-
-          <Link href="/my-requests" style={mobile ? mobileLink : desktopLink}>
-            My requests
-          </Link>
-
-          <Link href="/profile" style={mobile ? mobileLink : desktopLink}>
-            Profile
-          </Link>
-        </>
-      )}
-
-      <Link href="/contact" style={mobile ? mobileLink : desktopLink}>
-        Contact
-      </Link>
-
-      {!authLoading && !user && (
-        <>
-          <Link href="/login" style={mobile ? mobileLink : desktopLink}>
-            Log in
-          </Link>
-          <Link
-            href="/register"
-            style={{
-              ...(mobile ? mobileLink : desktopLink),
-              ...(mobile
-                ? {}
-                : {
-                    background: "var(--green-800)",
+        {!authLoading && user && (
+          <>
+            <Link href="/add-item" style={mobile ? mobileLink : desktopLink}>
+              {mobile ? (
+                "Add item"
+              ) : (
+                <span
+                  style={{
+                    background: "var(--gold)",
                     color: "var(--white)",
-                    padding: "7px 18px",
+                    padding: "7px 16px",
                     borderRadius: 999,
                     fontFamily: "var(--font-display)",
                     fontWeight: 700,
                     fontSize: 13,
-                  }),
+                    letterSpacing: "0.2px",
+                  }}
+                >
+                  + Add item
+                </span>
+              )}
+            </Link>
+
+            <Link
+              href="/dashboard"
+              style={
+                mobile ? mobileLink : { ...desktopLink, position: "relative" }
+              }
+            >
+              Dashboard
+              {pendingCount > 0 && !mobile && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: -4,
+                    right: -4,
+                    background: "var(--gold)",
+                    color: "#fff",
+                    fontSize: 9,
+                    fontWeight: 800,
+                    width: 16,
+                    height: 16,
+                    borderRadius: "50%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontFamily: "var(--font-display)",
+                  }}
+                >
+                  {pendingCount > 9 ? "9+" : pendingCount}
+                </span>
+              )}
+              {pendingCount > 0 && mobile && (
+                <span
+                  style={{
+                    marginLeft: 8,
+                    background: "var(--gold)",
+                    color: "#fff",
+                    fontSize: 10,
+                    fontWeight: 800,
+                    padding: "1px 7px",
+                    borderRadius: 999,
+                    fontFamily: "var(--font-display)",
+                  }}
+                >
+                  {pendingCount}
+                </span>
+              )}
+            </Link>
+
+            <Link href="/my-requests" style={mobile ? mobileLink : desktopLink}>
+              My requests
+            </Link>
+            <Link href="/profile" style={mobile ? mobileLink : desktopLink}>
+              Profile
+            </Link>
+          </>
+        )}
+
+        <Link href="/contact" style={mobile ? mobileLink : desktopLink}>
+          Contact
+        </Link>
+
+        {!authLoading && !user && (
+          <>
+            <Link href="/login" style={mobile ? mobileLink : desktopLink}>
+              Log in
+            </Link>
+            <Link
+              href="/register"
+              style={{
+                ...(mobile ? mobileLink : desktopLink),
+                ...(mobile
+                  ? {}
+                  : {
+                      background: "var(--green-800)",
+                      color: "var(--white)",
+                      padding: "7px 18px",
+                      borderRadius: 999,
+                      fontFamily: "var(--font-display)",
+                      fontWeight: 700,
+                      fontSize: 13,
+                    }),
+              }}
+            >
+              Sign up
+            </Link>
+          </>
+        )}
+
+        {!authLoading && user && (
+          <button
+            onClick={handleLogout}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#dc2626",
+              fontFamily: "var(--font-body)",
+              fontWeight: 600,
+              fontSize: mobile ? 15 : 13,
+              cursor: "pointer",
+              padding: mobile ? "4px 0" : 0,
             }}
           >
-            Sign up
-          </Link>
-        </>
-      )}
+            Logout
+          </button>
+        )}
+      </>
+    );
+  };
 
-      {!authLoading && user && (
-        <button
-          onClick={handleLogout}
-          style={{
-            background: "none",
-            border: "none",
-            color: "#dc2626",
-            fontFamily: "var(--font-body)",
-            fontWeight: 600,
-            fontSize: mobile ? 15 : 13,
-            cursor: "pointer",
-            padding: mobile ? "4px 0" : 0,
-          }}
-        >
-          Logout
-        </button>
-      )}
-    </>
-  );
-
-  // ALWAYS render the header shell — never return a blank div.
-  // Height is always 64px so nothing shifts when auth resolves.
   return (
     <>
       <header
@@ -223,6 +214,7 @@ export default function Header() {
           borderBottom: "1px solid var(--ink-100)",
         }}
       >
+        {/* TOP BAR */}
         <div
           style={{
             maxWidth: 1140,
@@ -252,7 +244,6 @@ export default function Header() {
                 src="/images/deklata-logo-light.svg"
                 alt="Deklata"
                 className="deklata-logo"
-                // Explicit dimensions prevent CLS
                 width={190}
                 height={36}
                 style={{ display: "block", height: 36, width: "auto" }}
@@ -261,10 +252,7 @@ export default function Header() {
           </Link>
 
           {/* DESKTOP NAV */}
-          <nav
-            style={{ display: "flex", gap: 4, alignItems: "center" }}
-            className="desktop-nav"
-          >
+          <nav className="desktop-nav">
             <NavLinks />
           </nav>
 
@@ -275,18 +263,18 @@ export default function Header() {
             aria-expanded={menuOpen}
             className="hamburger-btn"
             style={{
-              background: menuOpen ? "var(--green-50)" : "none",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 5,
+              background: menuOpen ? "var(--green-50)" : "transparent",
               border: "1.5px solid",
               borderColor: menuOpen ? "var(--green-100)" : "var(--ink-100)",
               borderRadius: 10,
               cursor: "pointer",
               padding: "8px 10px",
-              display: "flex",
-              flexDirection: "column",
-              gap: 5,
-              alignItems: "center",
-              justifyContent: "center",
-              transition: "all 0.2s ease",
+              transition: "background 0.2s ease, border-color 0.2s ease",
             }}
           >
             <span
@@ -296,7 +284,7 @@ export default function Header() {
                 height: 2,
                 background: "var(--ink-900)",
                 borderRadius: 2,
-                transition: "all 0.25s ease",
+                transition: "transform 0.25s ease",
                 transform: menuOpen
                   ? "rotate(45deg) translate(5px, 5px)"
                   : "none",
@@ -309,7 +297,7 @@ export default function Header() {
                 height: 2,
                 background: "var(--ink-900)",
                 borderRadius: 2,
-                transition: "all 0.25s ease",
+                transition: "opacity 0.25s ease",
                 opacity: menuOpen ? 0 : 1,
               }}
             />
@@ -320,7 +308,7 @@ export default function Header() {
                 height: 2,
                 background: "var(--ink-900)",
                 borderRadius: 2,
-                transition: "all 0.25s ease",
+                transition: "transform 0.25s ease",
                 transform: menuOpen
                   ? "rotate(-45deg) translate(5px, -5px)"
                   : "none",
@@ -358,28 +346,30 @@ export default function Header() {
             transform: translateY(0);
           }
         }
+
+        .desktop-nav {
+          display: none;
+          gap: 4px;
+          align-items: center;
+        }
+        .deklata-logo {
+          height: 32px;
+        }
+
         @media (min-width: 768px) {
           .desktop-nav {
-            display: flex !important;
+            display: flex;
           }
           .hamburger-btn {
             display: none !important;
           }
           .deklata-logo {
-            height: 40px !important;
-          }
-        }
-        @media (max-width: 767px) {
-          .desktop-nav {
-            display: none !important;
-          }
-          .deklata-logo {
-            height: 32px !important;
+            height: 40px;
           }
         }
         @media (max-width: 360px) {
           .deklata-logo {
-            height: 28px !important;
+            height: 28px;
           }
         }
       `}</style>
