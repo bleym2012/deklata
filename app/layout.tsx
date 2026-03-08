@@ -215,11 +215,11 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <ServiceWorkerRegistrar />
         <Header />
         <div className="page-container">{children}</div>
         <Footer />
         <PWAInstallBanner />
+        <ServiceWorkerRegistrar />
 
         {/* ── GOOGLE ANALYTICS — loads AFTER page is interactive ─────────────
             strategy="afterInteractive" means GA only runs after the user can

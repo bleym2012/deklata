@@ -36,6 +36,9 @@ const nextConfig: NextConfig = {
 
   // Compress HTML/JSON responses with gzip
   compress: true,
+  experimental: {
+    optimizePackageImports: ["@supabase/supabase-js"],
+  },
 
   // ── CACHE HEADERS ─────────────────────────────────────────────────────────
   // Tell browsers and Vercel's CDN how long to cache static assets.
