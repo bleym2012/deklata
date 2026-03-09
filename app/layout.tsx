@@ -8,8 +8,6 @@ import Header from "./components/Header";
 import Footer from "./components/Footer";
 import PWAInstallBanner from "./components/PWAInstallBanner";
 import ServiceWorkerRegistrar from "./components/ServiceWorkerRegistrar";
-import { createServerSupabaseClient } from "./lib/supabaseServer";
-import { cookies } from "next/headers";
 
 // next/font downloads and self-hosts fonts at build time — zero external
 // network request from the browser, eliminates the Google Fonts render-block.
@@ -56,12 +54,8 @@ export const metadata: Metadata = {
   creator: "Deklata",
   publisher: "Deklata",
 
-  // Canonical + alternates
-  alternates: {
-    canonical: BASE_URL,
-  },
+  alternates: { canonical: BASE_URL },
 
-  // Open Graph — controls WhatsApp, Facebook, LinkedIn previews
   openGraph: {
     type: "website",
     locale: "en_GH",
@@ -80,7 +74,6 @@ export const metadata: Metadata = {
     ],
   },
 
-  // Twitter / X card
   twitter: {
     card: "summary_large_image",
     title: "Deklata – Free Student Item Exchange",
@@ -89,18 +82,10 @@ export const metadata: Metadata = {
     creator: "@deklatapp",
   },
 
-  // PWA / mobile
   applicationName: "Deklata",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-    title: "Deklata",
-  },
-  formatDetection: {
-    telephone: false,
-  },
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "Deklata" },
+  formatDetection: { telephone: false },
 
-  // Indexing
   robots: {
     index: true,
     follow: true,
@@ -114,22 +99,14 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // Read the Supabase session cookie server-side.
-  // This tells us if the user is logged in BEFORE any HTML is sent to the browser.
-  // The correct nav is baked into the HTML — zero flash, zero JS needed for initial state.
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get("sb-iibknadykycghvbjbwxs-auth-token");
-  const initialUser = !!sessionCookie?.value;
-
   return (
     <html lang="en" className={`${syne.variable} ${dmSans.variable}`}>
       <head>
-        {/* Preconnect to Supabase — saves 200-400ms on first DB call */}
         <link
           rel="preconnect"
           href="https://iibknadykycghvbjbwxs.supabase.co"
@@ -138,8 +115,6 @@ export default async function RootLayout({
           rel="dns-prefetch"
           href="https://iibknadykycghvbjbwxs.supabase.co"
         />
-        {/* Google Fonts links REMOVED — next/font self-hosts them above,
-            eliminating this render-blocking external network request */}
 
         {/* PWA */}
         <meta
@@ -180,7 +155,7 @@ export default async function RootLayout({
         />
         <link rel="manifest" href="/manifest.webmanifest" />
 
-        {/* JSON-LD structured data — Organisation */}
+        {/* JSON-LD — Organisation */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -196,15 +171,12 @@ export default async function RootLayout({
                 "https://twitter.com/deklatapp",
                 "https://instagram.com/deklatapp",
               ],
-              areaServed: {
-                "@type": "Country",
-                name: "Ghana",
-              },
+              areaServed: { "@type": "Country", name: "Ghana" },
             }),
           }}
         />
 
-        {/* JSON-LD — WebSite with SearchAction (enables Google Sitelinks Search Box) */}
+        {/* JSON-LD — WebSite SearchAction */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -224,35 +196,23 @@ export default async function RootLayout({
             }),
           }}
         />
-        {/* ── ANTI-FLASH SCRIPT ────────────────────────────────────────────────
-            Runs synchronously before <body> is parsed — before React, before
-            any component renders. Reads the Supabase session directly from
-            localStorage and stamps data-auth="user" or data-auth="guest" on
-            <html>. CSS uses that attribute to show the correct nav from the
-            very first pixel painted. No flash is physically possible because
-            the correct state is known before anything is drawn.
-            ──────────────────────────────────────────────────────────────── */}
+
+        {/* ── ANTI-FLASH SCRIPT ──────────────────────────────────────────────
+            Runs synchronously BEFORE <body> is parsed — before React, before
+            any component, before any paint. Reads Supabase session from
+            localStorage and sets data-auth="user" or data-auth="guest" on
+            <html>. The CSS below uses that attribute to show the correct nav
+            from the very first pixel. Physically impossible to flash because
+            the correct state is stamped before anything is drawn.
+            ────────────────────────────────────────────────────────────────── */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `
-          (function() {
-            try {
-              var keys = Object.keys(localStorage);
-              var sessionKey = keys.find(function(k) {
-                return k.startsWith('sb-') && k.endsWith('-auth-token');
-              });
-              var session = sessionKey ? JSON.parse(localStorage.getItem(sessionKey)) : null;
-              var isLoggedIn = !!(session && session.access_token);
-              document.documentElement.setAttribute('data-auth', isLoggedIn ? 'user' : 'guest');
-            } catch(e) {
-              document.documentElement.setAttribute('data-auth', 'guest');
-            }
-          })();
-        `,
+            __html: `(function(){try{var k=Object.keys(localStorage).find(function(k){return k.startsWith('sb-')&&k.endsWith('-auth-token');});var s=k?JSON.parse(localStorage.getItem(k)):null;document.documentElement.setAttribute('data-auth',s&&s.access_token?'user':'guest');}catch(e){document.documentElement.setAttribute('data-auth','guest');}})();`,
           }}
         />
 
-        {/* Header CSS — static, ships with HTML, applied before first paint */}
+        {/* Header CSS — static, ships with the HTML document, applied before
+            first paint. No styled-jsx hash, no hydration mismatch possible. */}
         <style
           dangerouslySetInnerHTML={{
             __html: `
@@ -266,26 +226,20 @@ export default async function RootLayout({
             .header-desktop-nav   { display: flex !important; }
             .header-hamburger-btn { display: none  !important; }
           }
-
-          /* Hide auth-specific links until data-auth is known.
-             The inline script above sets this before body renders,
-             so the correct set is visible from frame one. */
+          /* Show correct nav set from first paint via data-auth on <html> */
           .nav-user  { display: none; }
           .nav-guest { display: none; }
-
           html[data-auth="user"]  .nav-user  { display: contents; }
           html[data-auth="guest"] .nav-guest { display: contents; }
-
-          /* Fallback: if data-auth not yet set, hide both to prevent flash */
-          html:not([data-auth]) .nav-user  { display: none; }
-          html:not([data-auth]) .nav-guest { display: none; }
+          html:not([data-auth]) .nav-user,
+          html:not([data-auth]) .nav-guest   { display: none; }
         `,
           }}
         />
       </head>
       <body suppressHydrationWarning>
         <ServiceWorkerRegistrar />
-        <Header initialUser={initialUser} />
+        <Header />
         <div className="page-container">{children}</div>
         <Footer />
         <PWAInstallBanner />
