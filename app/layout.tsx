@@ -220,11 +220,11 @@ export default function RootLayout({
             from { opacity: 0; transform: translateY(-8px); }
             to   { opacity: 1; transform: translateY(0); }
           }
-          .header-desktop-nav   { display: none; }
-          .header-hamburger-btn { display: flex; }
+          .header-desktop-nav   { display: none !important; }
+          .header-hamburger-btn { display: flex !important; }
           @media (min-width: 768px) {
             .header-desktop-nav   { display: flex !important; }
-            .header-hamburger-btn { display: none  !important; }
+            .header-hamburger-btn { display: none !important; }
           }
           /* Show correct nav set from first paint via data-auth on <html> */
           .nav-user  { display: none; }
