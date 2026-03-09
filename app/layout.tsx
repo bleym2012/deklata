@@ -1,66 +1,45 @@
-// app/layout.tsx
-//
-// WHAT CHANGED & WHY:
-//
-// 1. FONTS: Was loading Google Fonts via <link href="fonts.googleapis.com">
-//    This creates a render-blocking request. Every page waited for Google's
-//    servers before painting text. Switched to next/font which:
-//    - Downloads fonts at BUILD TIME and self-hosts them on Vercel
-//    - Zero extra network requests at runtime
-//    - Eliminates font-related CLS (layout shift from FOUT)
-//    - Saves ~300-500ms on mobile in Ghana
-//
-// 2. ANALYTICS: Was loading synchronously in <head>. Moved to afterInteractive
-//    strategy so it loads AFTER the page is visible and interactive.
-//    This alone can cut 500-1500ms off Total Blocking Time.
-//
-// 3. REMOVED: export const dynamic = "force-dynamic" from layout.
-//    This was forcing EVERY page to skip static generation. Removed so
-//    individual pages can opt into ISR/static as appropriate.
-
+// NO force-dynamic here — the root layout must be static so Next.js can
+// pre-render every page's shell at build time. Individual pages that need
+// dynamic data (dashboard, profile, etc.) set force-dynamic themselves.
 import type { Metadata } from "next";
 import { Syne, DM_Sans } from "next/font/google";
-import Script from "next/script";
 import "./globals.css";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import PWAInstallBanner from "./components/PWAInstallBanner";
 import ServiceWorkerRegistrar from "./components/ServiceWorkerRegistrar";
-import ErrorBoundary from "./components/ErrorBoundary";
+import { createServerSupabaseClient } from "./lib/supabaseServer";
+import { cookies } from "next/headers";
 
-// ── FONTS — self-hosted via next/font ────────────────────────────────────────
-// These download at build time and serve from Vercel CDN.
-// No Google Fonts request at runtime = no render blocking.
+// next/font downloads and self-hosts fonts at build time — zero external
+// network request from the browser, eliminates the Google Fonts render-block.
 const syne = Syne({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
-  variable: "--font-syne",
-  display: "swap", // prevents invisible text while loading
-  preload: true,
+  variable: "--font-display",
+  display: "swap",
 });
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
   weight: ["300", "400", "500", "600"],
   style: ["normal", "italic"],
-  variable: "--font-dm-sans",
+  variable: "--font-body",
   display: "swap",
-  preload: true,
 });
-
-// ── REPLACE THIS with your actual GA Measurement ID ──────────────────────────
-const GA_ID = process.env.NEXT_PUBLIC_GA_ID || "";
 
 const BASE_URL = "https://deklata.app";
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
+
   title: {
     default: "Deklata – Free Student Item Exchange in Ghana",
     template: "%s | Deklata",
   },
   description:
     "Deklata connects Ghanaian students to give and receive items they no longer need — safely, simply, and completely free. Browse listings from UDS Tamale, UDS Nyankpala and Tamale Technical University.",
+
   keywords: [
     "free items Ghana",
     "student exchange Ghana",
@@ -72,10 +51,17 @@ export const metadata: Metadata = {
     "Tamale Technical University",
     "UDS Nyankpala",
   ],
+
   authors: [{ name: "Deklata", url: BASE_URL }],
   creator: "Deklata",
   publisher: "Deklata",
-  alternates: { canonical: BASE_URL },
+
+  // Canonical + alternates
+  alternates: {
+    canonical: BASE_URL,
+  },
+
+  // Open Graph — controls WhatsApp, Facebook, LinkedIn previews
   openGraph: {
     type: "website",
     locale: "en_GH",
@@ -93,6 +79,8 @@ export const metadata: Metadata = {
       },
     ],
   },
+
+  // Twitter / X card
   twitter: {
     card: "summary_large_image",
     title: "Deklata – Free Student Item Exchange",
@@ -100,9 +88,19 @@ export const metadata: Metadata = {
     images: ["/og-image.png"],
     creator: "@deklatapp",
   },
+
+  // PWA / mobile
   applicationName: "Deklata",
-  appleWebApp: { capable: true, statusBarStyle: "default", title: "Deklata" },
-  formatDetection: { telephone: false },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Deklata",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+
+  // Indexing
   robots: {
     index: true,
     follow: true,
@@ -116,11 +114,18 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Read the Supabase session cookie server-side.
+  // This tells us if the user is logged in BEFORE any HTML is sent to the browser.
+  // The correct nav is baked into the HTML — zero flash, zero JS needed for initial state.
+  const cookieStore = await cookies();
+  const sessionCookie = cookieStore.get("sb-iibknadykycghvbjbwxs-auth-token");
+  const initialUser = !!sessionCookie?.value;
+
   return (
     <html lang="en" className={`${syne.variable} ${dmSans.variable}`}>
       <head>
@@ -133,8 +138,8 @@ export default function RootLayout({
           rel="dns-prefetch"
           href="https://iibknadykycghvbjbwxs.supabase.co"
         />
-
-        {/* NO MORE Google Fonts <link> here — handled by next/font above */}
+        {/* Google Fonts links REMOVED — next/font self-hosts them above,
+            eliminating this render-blocking external network request */}
 
         {/* PWA */}
         <meta
@@ -150,32 +155,32 @@ export default function RootLayout({
         <meta name="msapplication-TileColor" content="#1a5c3a" />
         <meta name="msapplication-tap-highlight" content="no" />
         <meta name="mobile-web-app-capable" content="yes" />
-        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+        <link
+          rel="apple-touch-icon"
+          sizes="152x152"
+          href="/icons/icon-152x152.png"
+        />
+        <link
+          rel="apple-touch-icon"
+          sizes="180x180"
+          href="/icons/icon-192x192.png"
+        />
         <link
           rel="icon"
           type="image/png"
           sizes="32x32"
-          href="/icons/favicon-32x32.png"
+          href="/icons/icon-96x96.png"
         />
         <link
           rel="icon"
           type="image/png"
           sizes="16x16"
-          href="/icons/favicon-16x16.png"
+          href="/icons/icon-72x72.png"
         />
-        <link rel="icon" href="/icons/favicon.ico" />
-        <link rel="manifest" href="/icons/site.webmanifest" />
-        {/* Prevents nav flash on mobile before CSS hydrates */}
-        <style
-          dangerouslySetInnerHTML={{
-            __html: `
-  @media (max-width: 767px) { .desktop-nav { display: none !important; } }
-  @media (min-width: 768px) { .hamburger-btn { display: none !important; } }
-`,
-          }}
-        />
+        <link rel="manifest" href="/manifest.webmanifest" />
 
-        {/* JSON-LD */}
+        {/* JSON-LD structured data — Organisation */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -191,10 +196,15 @@ export default function RootLayout({
                 "https://twitter.com/deklatapp",
                 "https://instagram.com/deklatapp",
               ],
-              areaServed: { "@type": "Country", name: "Ghana" },
+              areaServed: {
+                "@type": "Country",
+                name: "Ghana",
+              },
             }),
           }}
         />
+
+        {/* JSON-LD — WebSite with SearchAction (enables Google Sitelinks Search Box) */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -214,36 +224,71 @@ export default function RootLayout({
             }),
           }}
         />
-      </head>
-      <body>
-        <ErrorBoundary>
-          <Header />
-          <div className="page-container">{children}</div>
-          <Footer />
-        </ErrorBoundary>
-        <PWAInstallBanner />
-        <ServiceWorkerRegistrar />
+        {/* ── ANTI-FLASH SCRIPT ────────────────────────────────────────────────
+            Runs synchronously before <body> is parsed — before React, before
+            any component renders. Reads the Supabase session directly from
+            localStorage and stamps data-auth="user" or data-auth="guest" on
+            <html>. CSS uses that attribute to show the correct nav from the
+            very first pixel painted. No flash is physically possible because
+            the correct state is known before anything is drawn.
+            ──────────────────────────────────────────────────────────────── */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+          (function() {
+            try {
+              var keys = Object.keys(localStorage);
+              var sessionKey = keys.find(function(k) {
+                return k.startsWith('sb-') && k.endsWith('-auth-token');
+              });
+              var session = sessionKey ? JSON.parse(localStorage.getItem(sessionKey)) : null;
+              var isLoggedIn = !!(session && session.access_token);
+              document.documentElement.setAttribute('data-auth', isLoggedIn ? 'user' : 'guest');
+            } catch(e) {
+              document.documentElement.setAttribute('data-auth', 'guest');
+            }
+          })();
+        `,
+          }}
+        />
 
-        {/* ── GOOGLE ANALYTICS — loads AFTER page is interactive ─────────────
-            strategy="afterInteractive" means GA only runs after the user can
-            already see and use the page. This removes GA from the critical path
-            and stops it contributing to Total Blocking Time.               ── */}
-        {GA_ID && (
-          <>
-            <Script
-              src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
-              strategy="afterInteractive"
-            />
-            <Script id="google-analytics" strategy="afterInteractive">
-              {`
-                window.dataLayer = window.dataLayer || [];
-                function gtag(){dataLayer.push(arguments);}
-                gtag('js', new Date());
-                gtag('config', '${GA_ID}', { page_path: window.location.pathname });
-              `}
-            </Script>
-          </>
-        )}
+        {/* Header CSS — static, ships with HTML, applied before first paint */}
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+          @keyframes header-slideDown {
+            from { opacity: 0; transform: translateY(-8px); }
+            to   { opacity: 1; transform: translateY(0); }
+          }
+          .header-desktop-nav   { display: none; }
+          .header-hamburger-btn { display: flex; }
+          @media (min-width: 768px) {
+            .header-desktop-nav   { display: flex !important; }
+            .header-hamburger-btn { display: none  !important; }
+          }
+
+          /* Hide auth-specific links until data-auth is known.
+             The inline script above sets this before body renders,
+             so the correct set is visible from frame one. */
+          .nav-user  { display: none; }
+          .nav-guest { display: none; }
+
+          html[data-auth="user"]  .nav-user  { display: contents; }
+          html[data-auth="guest"] .nav-guest { display: contents; }
+
+          /* Fallback: if data-auth not yet set, hide both to prevent flash */
+          html:not([data-auth]) .nav-user  { display: none; }
+          html:not([data-auth]) .nav-guest { display: none; }
+        `,
+          }}
+        />
+      </head>
+      <body suppressHydrationWarning>
+        <ServiceWorkerRegistrar />
+        <Header initialUser={initialUser} />
+        <div className="page-container">{children}</div>
+        <Footer />
+        <PWAInstallBanner />
       </body>
     </html>
   );

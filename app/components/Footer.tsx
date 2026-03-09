@@ -9,8 +9,9 @@ export default function Footer() {
   const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user);
+    // getSession() reads from localStorage — zero network call, instant
+    supabase.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user ?? null);
       setAuthChecked(true);
     });
     const { data: listener } = supabase.auth.onAuthStateChange(

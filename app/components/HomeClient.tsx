@@ -10,7 +10,7 @@
 // paints immediately on first load — no waiting for JS.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabaseClient";
@@ -129,7 +129,7 @@ export default function HomeClient({
       return;
     }
     setShowSuggestions(true);
-    suggestTimer.current = setTimeout(() => fetchSuggestions(value), 250);
+    suggestTimer.current = setTimeout(() => fetchSuggestions(value), 350);
   }
 
   // ── URL helpers ────────────────────────────────────────────────────────────

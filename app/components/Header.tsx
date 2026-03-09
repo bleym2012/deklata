@@ -1,43 +1,50 @@
 "use client";
 
+// Header receives initialUser from the server (read from the auth cookie).
+// This means the correct nav state is known BEFORE the page reaches the
+// browser — no client-side guessing, no flash, no hydration error.
+//
+// Client-side auth listener then keeps it in sync for signIn/signOut events.
+
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "../lib/supabaseClient";
 
-export default function Header() {
+interface Props {
+  initialUser: boolean; // true = logged in, passed from server
+}
+
+export default function Header({ initialUser }: Props) {
   const router = useRouter();
   const pathname = usePathname();
-  const [user, setUser] = useState<any>(null);
-  const [authLoading, setAuthLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(initialUser);
   const [pendingCount, setPendingCount] = useState(0);
-  // mounted = false on server, true after first client render.
-  // We use this to hide nav links until auth state is known,
-  // preventing the "How it works / Contact only" flash.
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    // Sync pending count for logged-in users
+    if (isLoggedIn) {
+      supabase.auth.getSession().then(({ data }) => {
+        const uid = data.session?.user?.id;
+        if (uid) fetchPendingCount(uid);
+      });
+    }
 
-    supabase.auth.getSession().then(({ data }) => {
-      const u = data.session?.user ?? null;
-      setUser(u);
-      setAuthLoading(false);
-      if (u) fetchPendingCount(u.id);
-    });
-
+    // Keep auth state in sync after login/logout events
     const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setUser(session?.user ?? null);
-        setAuthLoading(false);
-        if (session?.user) fetchPendingCount(session.user.id);
-        else setPendingCount(0);
+      async (_event, session) => {
+        const loggedIn = !!session?.user;
+        setIsLoggedIn(loggedIn);
+        if (loggedIn && session?.user) {
+          fetchPendingCount(session.user.id);
+        } else {
+          setPendingCount(0);
+        }
       },
     );
-
     return () => listener.subscription.unsubscribe();
-  }, []);
+  }, [isLoggedIn]);
 
   async function fetchPendingCount(uid: string) {
     const { data } = await supabase
@@ -58,322 +65,270 @@ export default function Header() {
     router.push("/");
   }
 
-  // Before mount: render nothing inside nav.
-  // This means server HTML has an empty nav — no links to flash.
-  // After mount: auth resolves within ~1 frame and correct links appear.
-  const NavLinks = ({ mobile = false }: { mobile?: boolean }) => {
-    if (!mounted) return null;
+  const NavLinks = ({ mobile = false }: { mobile?: boolean }) => (
+    <>
+      <Link href="/how-it-works" style={mobile ? mobileLink : desktopLink}>
+        How it works
+      </Link>
 
-    return (
-      <>
-        <Link href="/how-it-works" style={mobile ? mobileLink : desktopLink}>
-          How it works
-        </Link>
+      {isLoggedIn && (
+        <>
+          <Link href="/add-item" style={mobile ? mobileLink : desktopLink}>
+            {mobile ? (
+              "Add item"
+            ) : (
+              <span
+                style={{
+                  background: "var(--gold)",
+                  color: "var(--white)",
+                  padding: "7px 16px",
+                  borderRadius: 999,
+                  fontFamily: "var(--font-display)",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  letterSpacing: "0.2px",
+                }}
+              >
+                + Add item
+              </span>
+            )}
+          </Link>
 
-        {!authLoading && user && (
-          <>
-            <Link href="/add-item" style={mobile ? mobileLink : desktopLink}>
-              {mobile ? (
-                "Add item"
-              ) : (
-                <span
-                  style={{
-                    background: "var(--gold)",
+          <Link
+            href="/dashboard"
+            style={
+              mobile ? mobileLink : { ...desktopLink, position: "relative" }
+            }
+          >
+            Dashboard
+            {pendingCount > 0 && !mobile && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: -4,
+                  right: -4,
+                  background: "var(--gold)",
+                  color: "#fff",
+                  fontSize: 9,
+                  fontWeight: 800,
+                  width: 16,
+                  height: 16,
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontFamily: "var(--font-display)",
+                }}
+              >
+                {pendingCount > 9 ? "9+" : pendingCount}
+              </span>
+            )}
+            {pendingCount > 0 && mobile && (
+              <span
+                style={{
+                  marginLeft: 8,
+                  background: "var(--gold)",
+                  color: "#fff",
+                  fontSize: 10,
+                  fontWeight: 800,
+                  padding: "1px 7px",
+                  borderRadius: 999,
+                  fontFamily: "var(--font-display)",
+                }}
+              >
+                {pendingCount}
+              </span>
+            )}
+          </Link>
+
+          <Link href="/my-requests" style={mobile ? mobileLink : desktopLink}>
+            My requests
+          </Link>
+          <Link href="/profile" style={mobile ? mobileLink : desktopLink}>
+            Profile
+          </Link>
+        </>
+      )}
+
+      <Link href="/contact" style={mobile ? mobileLink : desktopLink}>
+        Contact
+      </Link>
+
+      {!isLoggedIn && (
+        <>
+          <Link href="/login" style={mobile ? mobileLink : desktopLink}>
+            Log in
+          </Link>
+          <Link
+            href="/register"
+            style={{
+              ...(mobile ? mobileLink : desktopLink),
+              ...(mobile
+                ? {}
+                : {
+                    background: "var(--green-800)",
                     color: "var(--white)",
-                    padding: "7px 16px",
+                    padding: "7px 18px",
                     borderRadius: 999,
                     fontFamily: "var(--font-display)",
                     fontWeight: 700,
                     fontSize: 13,
-                    letterSpacing: "0.2px",
-                  }}
-                >
-                  + Add item
-                </span>
-              )}
-            </Link>
-
-            <Link
-              href="/dashboard"
-              style={
-                mobile ? mobileLink : { ...desktopLink, position: "relative" }
-              }
-            >
-              Dashboard
-              {pendingCount > 0 && !mobile && (
-                <span
-                  style={{
-                    position: "absolute",
-                    top: -4,
-                    right: -4,
-                    background: "var(--gold)",
-                    color: "#fff",
-                    fontSize: 9,
-                    fontWeight: 800,
-                    width: 16,
-                    height: 16,
-                    borderRadius: "50%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontFamily: "var(--font-display)",
-                  }}
-                >
-                  {pendingCount > 9 ? "9+" : pendingCount}
-                </span>
-              )}
-              {pendingCount > 0 && mobile && (
-                <span
-                  style={{
-                    marginLeft: 8,
-                    background: "var(--gold)",
-                    color: "#fff",
-                    fontSize: 10,
-                    fontWeight: 800,
-                    padding: "1px 7px",
-                    borderRadius: 999,
-                    fontFamily: "var(--font-display)",
-                  }}
-                >
-                  {pendingCount}
-                </span>
-              )}
-            </Link>
-
-            <Link href="/my-requests" style={mobile ? mobileLink : desktopLink}>
-              My requests
-            </Link>
-            <Link href="/profile" style={mobile ? mobileLink : desktopLink}>
-              Profile
-            </Link>
-          </>
-        )}
-
-        <Link href="/contact" style={mobile ? mobileLink : desktopLink}>
-          Contact
-        </Link>
-
-        {!authLoading && !user && (
-          <>
-            <Link href="/login" style={mobile ? mobileLink : desktopLink}>
-              Log in
-            </Link>
-            <Link
-              href="/register"
-              style={{
-                ...(mobile ? mobileLink : desktopLink),
-                ...(mobile
-                  ? {}
-                  : {
-                      background: "var(--green-800)",
-                      color: "var(--white)",
-                      padding: "7px 18px",
-                      borderRadius: 999,
-                      fontFamily: "var(--font-display)",
-                      fontWeight: 700,
-                      fontSize: 13,
-                    }),
-              }}
-            >
-              Sign up
-            </Link>
-          </>
-        )}
-
-        {!authLoading && user && (
-          <button
-            onClick={handleLogout}
-            style={{
-              background: "none",
-              border: "none",
-              color: "#dc2626",
-              fontFamily: "var(--font-body)",
-              fontWeight: 600,
-              fontSize: mobile ? 15 : 13,
-              cursor: "pointer",
-              padding: mobile ? "4px 0" : 0,
+                  }),
             }}
           >
-            Logout
-          </button>
-        )}
-      </>
-    );
-  };
+            Sign up
+          </Link>
+        </>
+      )}
 
-  return (
-    <>
-      <header
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 100,
-          background: "var(--background, rgba(250,249,246,0.95))",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-          borderBottom: "1px solid var(--ink-100)",
-        }}
-      >
-        {/* TOP BAR */}
-        <div
+      {isLoggedIn && (
+        <button
+          onClick={handleLogout}
           style={{
-            maxWidth: 1140,
-            margin: "0 auto",
-            padding: "0 20px",
-            height: 64,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
+            background: "none",
+            border: "none",
+            color: "#dc2626",
+            fontFamily: "var(--font-body)",
+            fontWeight: 600,
+            fontSize: mobile ? 15 : 13,
+            cursor: "pointer",
+            padding: mobile ? "4px 0" : 0,
           }}
         >
-          {/* LOGO */}
-          <Link
-            href="/"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              flexShrink: 0,
-            }}
-          >
-            <picture>
-              <source
-                srcSet="/images/deklata-logo-dark.svg"
-                media="(prefers-color-scheme: dark)"
-              />
-              <img
-                src="/images/deklata-logo-light.svg"
-                alt="Deklata"
-                className="deklata-logo"
-                width={190}
-                height={36}
-                style={{ display: "block", height: 36, width: "auto" }}
-              />
-            </picture>
-          </Link>
-
-          {/* DESKTOP NAV */}
-          <nav className="desktop-nav">
-            <NavLinks />
-          </nav>
-
-          {/* HAMBURGER */}
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            aria-label="Toggle menu"
-            aria-expanded={menuOpen}
-            className="hamburger-btn"
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 5,
-              background: menuOpen ? "var(--green-50)" : "transparent",
-              border: "1.5px solid",
-              borderColor: menuOpen ? "var(--green-100)" : "var(--ink-100)",
-              borderRadius: 10,
-              cursor: "pointer",
-              padding: "8px 10px",
-              transition: "background 0.2s ease, border-color 0.2s ease",
-            }}
-          >
-            <span
-              style={{
-                display: "block",
-                width: 20,
-                height: 2,
-                background: "var(--ink-900)",
-                borderRadius: 2,
-                transition: "transform 0.25s ease",
-                transform: menuOpen
-                  ? "rotate(45deg) translate(5px, 5px)"
-                  : "none",
-              }}
-            />
-            <span
-              style={{
-                display: "block",
-                width: 20,
-                height: 2,
-                background: "var(--ink-900)",
-                borderRadius: 2,
-                transition: "opacity 0.25s ease",
-                opacity: menuOpen ? 0 : 1,
-              }}
-            />
-            <span
-              style={{
-                display: "block",
-                width: 20,
-                height: 2,
-                background: "var(--ink-900)",
-                borderRadius: 2,
-                transition: "transform 0.25s ease",
-                transform: menuOpen
-                  ? "rotate(-45deg) translate(5px, -5px)"
-                  : "none",
-              }}
-            />
-          </button>
-        </div>
-
-        {/* MOBILE DRAWER */}
-        {menuOpen && (
-          <div
-            style={{
-              borderTop: "1px solid var(--ink-100)",
-              padding: "20px 20px 24px",
-              display: "flex",
-              flexDirection: "column",
-              gap: 6,
-              background: "var(--background, rgba(250,249,246,0.98))",
-              animation: "slideDown 0.18s ease",
-            }}
-          >
-            <NavLinks mobile />
-          </div>
-        )}
-      </header>
-
-      <style jsx>{`
-        @keyframes slideDown {
-          from {
-            opacity: 0;
-            transform: translateY(-8px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        .desktop-nav {
-          display: none;
-          gap: 4px;
-          align-items: center;
-        }
-        .deklata-logo {
-          height: 32px;
-        }
-
-        @media (min-width: 768px) {
-          .desktop-nav {
-            display: flex;
-          }
-          .hamburger-btn {
-            display: none !important;
-          }
-          .deklata-logo {
-            height: 40px;
-          }
-        }
-        @media (max-width: 360px) {
-          .deklata-logo {
-            height: 28px;
-          }
-        }
-      `}</style>
+          Logout
+        </button>
+      )}
     </>
+  );
+
+  return (
+    <header
+      style={{
+        position: "sticky",
+        top: 0,
+        zIndex: 100,
+        background: "rgba(250,249,246,0.95)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
+        borderBottom: "1px solid var(--ink-100)",
+      }}
+    >
+      <div
+        style={{
+          maxWidth: 1140,
+          margin: "0 auto",
+          padding: "0 20px",
+          height: 64,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <Link
+          href="/"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            flexShrink: 0,
+          }}
+        >
+          <picture>
+            <source
+              srcSet="/images/deklata-logo-dark.svg"
+              media="(prefers-color-scheme: dark)"
+            />
+            <img
+              src="/images/deklata-logo-light.svg"
+              alt="Deklata"
+              width={160}
+              height={40}
+              style={{ display: "block" }}
+            />
+          </picture>
+        </Link>
+
+        <nav
+          className="header-desktop-nav"
+          style={{ display: "flex", gap: 4, alignItems: "center" }}
+        >
+          <NavLinks />
+        </nav>
+
+        <button
+          onClick={() => setMenuOpen((o) => !o)}
+          aria-label="Toggle menu"
+          aria-expanded={menuOpen}
+          className="header-hamburger-btn"
+          style={{
+            background: menuOpen ? "var(--green-50)" : "none",
+            border: "1.5px solid",
+            borderColor: menuOpen ? "var(--green-100)" : "var(--ink-100)",
+            borderRadius: 10,
+            cursor: "pointer",
+            padding: "8px 10px",
+            flexDirection: "column",
+            gap: 5,
+            alignItems: "center",
+            justifyContent: "center",
+            transition: "all 0.2s ease",
+          }}
+        >
+          <span
+            style={{
+              display: "block",
+              width: 20,
+              height: 2,
+              background: "var(--ink-900)",
+              borderRadius: 2,
+              transition: "all 0.25s ease",
+              transform: menuOpen
+                ? "rotate(45deg) translate(5px, 5px)"
+                : "none",
+            }}
+          />
+          <span
+            style={{
+              display: "block",
+              width: 20,
+              height: 2,
+              background: "var(--ink-900)",
+              borderRadius: 2,
+              transition: "all 0.25s ease",
+              opacity: menuOpen ? 0 : 1,
+            }}
+          />
+          <span
+            style={{
+              display: "block",
+              width: 20,
+              height: 2,
+              background: "var(--ink-900)",
+              borderRadius: 2,
+              transition: "all 0.25s ease",
+              transform: menuOpen
+                ? "rotate(-45deg) translate(5px, -5px)"
+                : "none",
+            }}
+          />
+        </button>
+      </div>
+
+      {menuOpen && (
+        <div
+          style={{
+            borderTop: "1px solid var(--ink-100)",
+            padding: "20px 20px 24px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+            background: "var(--cream)",
+            animation: "header-slideDown 0.18s ease",
+          }}
+        >
+          <NavLinks mobile />
+        </div>
+      )}
+    </header>
   );
 }
 

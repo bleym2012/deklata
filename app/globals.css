@@ -1,3 +1,6 @@
+/* Google Fonts @import REMOVED — next/font in layout.tsx self-hosts
+   fonts at build time. The --font-display and --font-body CSS variables
+   are now injected by next/font via className on <html>. */
 @import "tailwindcss";
 
 /* ================================
@@ -37,8 +40,8 @@
   --button-text: var(--white);
 
   /* TYPOGRAPHY */
-  --font-display: var(--font-syne, "Syne", sans-serif);
-  --font-body: var(--font-dm-sans, "DM Sans", sans-serif);
+  --font-display: "Syne", sans-serif;
+  --font-body: "DM Sans", sans-serif;
 
   /* RADIUS */
   --radius-sm: 8px;
@@ -768,68 +771,6 @@ select {
   /* Images — slightly dimmed to reduce glare */
   img:not([src*="icon"]):not([src*="logo"]) {
     filter: brightness(0.92) saturate(0.95);
-  }
-
-  /* ── Search bar dark mode ── */
-
-  /* Outer input wrapper */
-  .search-bar-input-row {
-    background: var(--card-bg) !important;
-    border-color: var(--card-border) !important;
-  }
-  .search-bar-input-row:focus-within {
-    border-color: var(--green-700) !important;
-    box-shadow: 0 0 0 3px rgba(45, 138, 94, 0.18);
-  }
-
-  /* The text input inside the bar */
-  .search-bar-input {
-    background: transparent !important;
-    color: var(--ink-900) !important;
-  }
-  .search-bar-input::placeholder {
-    color: var(--ink-300) !important;
-  }
-
-  /* X clear button */
-  .search-bar-clear {
-    color: var(--ink-500) !important;
-  }
-  .search-bar-clear:hover {
-    background: var(--ink-100) !important;
-    color: var(--ink-700) !important;
-  }
-
-  /* Divider between input and Search button */
-  .search-bar-divider {
-    background: var(--card-border) !important;
-  }
-
-  /* Suggestions dropdown */
-  .search-suggestions {
-    background: var(--card-bg) !important;
-    border-color: var(--card-border) !important;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
-  }
-  .search-suggestion-row {
-    color: var(--ink-900) !important;
-    border-bottom-color: var(--ink-100) !important;
-  }
-  .search-suggestion-row:hover,
-  .search-suggestion-row.active {
-    background: var(--green-100) !important;
-  }
-
-  /* Hero banner dark mode */
-  .hero-banner {
-    background: linear-gradient(135deg, #0d1f14 0%, #1a3322 100%) !important;
-    border-color: #243d2e !important;
-  }
-  .hero-banner-headline {
-    color: #e8ede9 !important;
-  }
-  .hero-banner-sub {
-    color: var(--green-700) !important;
   }
 }
 

@@ -1,227 +1,79 @@
-"use client";
+// app/item/[id]/page.tsx
+//
+// SERVER COMPONENT — no "use client", no JS shipped for this file.
+// Fetches item + images on the server at Vercel edge (close to user).
+// Full HTML is sent to browser on first byte — LCP image starts loading
+// before any JS is downloaded. Previously the page was blank until
+// the entire JS bundle parsed and 3 Supabase queries completed.
+//
+// Only the interactive parts (carousel, request button, delete, auth)
+// are in ItemActions.tsx — a small focused client component.
 
-export const dynamic = "force-dynamic";
+import { notFound } from "next/navigation";
+import { createServerSupabaseClient } from "../../lib/supabaseServer";
+import ItemActions from "./ItemActions";
+import type { Metadata } from "next";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import Image from "next/image";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { supabase } from "../../lib/supabaseClient";
-import { requireVerifiedUser } from "../../lib/requireVerifiedUser";
+interface PageProps {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}
 
-export default function ItemDetailsPage() {
-  const { id } = useParams();
-  const router = useRouter();
-  const searchParams = useSearchParams();
+// Generate metadata server-side — title/description in <head> before JS loads
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const supabase = createServerSupabaseClient();
+  const { data: item } = await supabase
+    .from("items")
+    .select("name, description, pickup_location")
+    .eq("id", id)
+    .single();
 
-  // backUrl = exact URL the user was on before clicking the item
-  // searchParams already contains page, category, q — just pass them straight back
-  const rawParams = searchParams.toString();
-  const backUrl = rawParams ? `/?${rawParams}` : "/";
+  if (!item) return { title: "Item not found | Deklata" };
 
-  const [item, setItem] = useState<any>(null);
-  const [images, setImages] = useState<any[]>([]);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [hasRequested, setHasRequested] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [requesting, setRequesting] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [showFullDescription, setShowFullDescription] = useState(false);
-  const [requestSuccess, setRequestSuccess] = useState(false);
+  return {
+    title: `${item.name} – Free on Deklata`,
+    description: `${item.name} available for free pickup${
+      item.pickup_location ? ` at ${item.pickup_location}` : ""
+    }. ${item.description?.slice(0, 120) || ""}`,
+  };
+}
 
-  useEffect(() => {
-    loadItem();
-  }, []);
+export default async function ItemDetailsPage({
+  params,
+  searchParams,
+}: PageProps) {
+  const { id } = await params;
+  const resolvedSearchParams = await searchParams;
 
-  async function loadItem() {
-    setLoading(true);
+  // Build backUrl on the server — no useSearchParams needed in client
+  const paramEntries = Object.entries(resolvedSearchParams)
+    .filter(([, v]) => v !== undefined)
+    .map(([k, v]) => `${k}=${v}`);
+  const backUrl = paramEntries.length > 0 ? `/?${paramEntries.join("&")}` : "/";
 
-    // Run auth + item + images in parallel — saves ~300ms on mobile
-    const [
-      {
-        data: { user },
-      },
-      { data: itemData },
-      { data: imageData },
-    ] = await Promise.all([
-      supabase.auth.getUser(),
-      supabase
-        .from("items")
-        .select(`*, categories ( id, name )`)
-        .eq("id", id)
-        .single(),
-      supabase.from("item_images").select("*").eq("item_id", id),
-    ]);
-
-    setUserId(user ? user.id : null);
-
-    // Only fetch request status if logged in — run after we know user
-    if (user) {
-      const { data: existingRequest } = await supabase
-        .from("requests")
-        .select("id")
-        .eq("item_id", id)
-        .eq("requester_id", user.id)
-        .maybeSingle();
-      setHasRequested(!!existingRequest);
-    } else {
-      setHasRequested(false);
-    }
-
-    setItem(itemData);
-    setImages(imageData || []);
-    setActiveIndex(0);
-    setLoading(false);
-  }
-
-  // Update document title dynamically for SEO-adjacent UX
-  useEffect(() => {
-    if (item) {
-      document.title = `${item.name} – Free on Deklata`;
-    }
-    return () => {
-      document.title = "Deklata – Free Student Item Exchange";
-    };
-  }, [item]);
-
-  async function requestItem() {
-    const check = await requireVerifiedUser();
-    if (!check.ok) {
-      if (check.reason === "not_logged_in") {
-        router.push(`/login?redirect=/item/${id}`);
-      } else {
-        alert("Please verify your email before requesting items.");
-      }
-      return;
-    }
-
-    setRequesting(true);
-
-    // Get a FRESH session token NOW — before any other async work.
-    // getSession() reads from localStorage and can return stale/null token
-    // after the tab has been open a while. getUser() forces a server round-trip
-    // and refreshes the token, so the session we grab right after is guaranteed valid.
-    const {
-      data: { user: freshUser },
-    } = await supabase.auth.getUser();
-    const {
-      data: { session: freshSession },
-    } = await supabase.auth.getSession();
-    const accessToken = freshSession?.access_token ?? null;
-
-    const { data, error } = await supabase.rpc("request_item", {
-      p_item_id: id,
-      p_user_id: userId,
-    });
-    if (error) {
-      console.error("X request_item RPC failed:", error);
-      alert(error.message);
-      setRequesting(false);
-      return;
-    }
-
-    // Fire email notification in the background — don't block the UI
-    if (freshUser && accessToken) {
-      (async () => {
-        try {
-          await fetch(
-            "https://iibknadykycghvbjbwxs.supabase.co/functions/v1/notify-owner-request",
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: "Bearer " + accessToken,
-              },
-              body: JSON.stringify({ item_id: id }),
-            },
-          );
-        } catch (emailError) {
-          console.error("Email notification failed:", emailError);
-        }
-      })();
-    }
-
-    await loadItem();
-    setRequesting(false);
-    setRequestSuccess(true);
-    setTimeout(() => setRequestSuccess(false), 4000);
-  }
-
-  async function deleteItem() {
-    if (
-      !confirm(
-        "Delete this item permanently? Any active requests will be cancelled.",
-      )
-    )
-      return;
-    // First reject/delete all requests so requesters are not left hanging
-    await supabase
-      .from("requests")
-      .update({ status: "rejected" })
-      .eq("item_id", id)
-      .in("status", ["pending", "approved"]);
-    await supabase.from("requests").delete().eq("item_id", id);
-    await supabase.from("item_images").delete().eq("item_id", id);
-    const { error } = await supabase
+  // Fetch item + images in parallel on the server.
+  // This runs at Vercel's edge — much closer to the user than the browser
+  // calling Supabase directly from Ghana.
+  const supabase = createServerSupabaseClient();
+  const [{ data: item }, { data: imageData }] = await Promise.all([
+    supabase
       .from("items")
-      .delete()
+      .select(`*, categories ( id, name )`)
       .eq("id", id)
-      .eq("owner_id", userId);
-    if (error) {
-      alert("Could not delete item. You may not have permission.");
-      return;
-    }
-    router.push(backUrl);
-  }
+      .single(),
+    supabase.from("item_images").select("*").eq("item_id", id),
+  ]);
 
-  // Dynamic <head> tags once item is loaded
-  const pageTitle = item ? `${item.name} – Free on Deklata` : "Item | Deklata";
-  const pageDesc = item
-    ? `${item.name} available for free pickup${item.pickup_location ? ` at ${item.pickup_location}` : ""}. ${item.description?.slice(0, 120) || ""}`
-    : "Free item available on Deklata";
-  const pageImage = images[0]?.image_url || "https://deklata.app/og-image.png";
+  // Item not found — show Next.js 404 page
+  if (!item) notFound();
+
+  const images = imageData || [];
   const pageUrl = `https://deklata.app/item/${id}`;
 
-  if (loading || !item) {
-    return (
-      <main style={{ maxWidth: 1140, margin: "0 auto", padding: "24px 16px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 32 }}>
-          <div
-            className="skeleton"
-            style={{ width: "100%", height: 380, borderRadius: 20 }}
-          />
-          <div>
-            <div
-              className="skeleton"
-              style={{ height: 32, width: "65%", marginBottom: 12 }}
-            />
-            <div
-              className="skeleton"
-              style={{ height: 14, width: "90%", marginBottom: 8 }}
-            />
-            <div
-              className="skeleton"
-              style={{ height: 14, width: "80%", marginBottom: 8 }}
-            />
-            <div
-              className="skeleton"
-              style={{ height: 52, width: "100%", marginTop: 24 }}
-            />
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  const isOwner = userId === item.owner_id;
-  const isFreshToday =
-    item.created_at &&
-    Date.now() - new Date(item.created_at).getTime() < 86400000;
-  const shareUrl = `https://deklata.app/item/${id}`;
-  const whatsappUrl = `https://wa.me/?text=${encodeURIComponent("Check out this free item on Deklata: " + item.name + " - " + shareUrl)}`;
-  const isLoggedIn = !!userId;
-
-  // JSON-LD for this specific item
+  // JSON-LD structured data — in <head> on first byte, helps SEO
   const itemJsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -236,406 +88,25 @@ export default function ItemDetailsPage() {
         ? "https://schema.org/SoldOut"
         : "https://schema.org/InStock",
       url: pageUrl,
-      seller: {
-        "@type": "Organization",
-        name: "Deklata",
-      },
+      seller: { "@type": "Organization", name: "Deklata" },
     },
     category: item.categories?.name || "General",
   };
 
   return (
     <>
-      <main
-        style={{
-          width: "100%",
-          maxWidth: 1140,
-          margin: "0 auto",
-          padding: "16px 20px 48px",
-          boxSizing: "border-box",
-        }}
-      >
-        {/* BACK */}
-        <button
-          onClick={() => router.push(backUrl)}
-          style={{
-            background: "none",
-            border: "none",
-            color: "var(--green-700)",
-            cursor: "pointer",
-            marginBottom: 24,
-            fontSize: 14,
-            fontWeight: 600,
-            fontFamily: "var(--font-body)",
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "8px 0",
-          }}
-        >
-          ← Back to results
-        </button>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(itemJsonLd) }}
+      />
 
-        {/* LAYOUT */}
-        <div
-          style={{ display: "grid", gridTemplateColumns: "1fr", gap: 28 }}
-          className="detail-grid"
-        >
-          {/* LEFT — IMAGES */}
-          <div>
-            <div
-              onScroll={(e) => {
-                const scrollLeft = e.currentTarget.scrollLeft;
-                const width = e.currentTarget.clientWidth;
-                setActiveIndex(Math.round(scrollLeft / width));
-              }}
-              style={{
-                display: "flex",
-                width: "100%",
-                overflowX: "auto",
-                overflowY: "hidden",
-                scrollSnapType: "x mandatory",
-                WebkitOverflowScrolling: "touch",
-                borderRadius: 20,
-                gap: 0,
-              }}
-            >
-              {images.length > 0 ? (
-                images.map((img) => (
-                  <div
-                    key={img.id}
-                    style={{
-                      position: "relative",
-                      flexShrink: 0,
-                      width: "100%",
-                      aspectRatio: "4 / 3",
-                      maxHeight: "55vh",
-                      borderRadius: 20,
-                      scrollSnapAlign: "start",
-                      background: "var(--green-50)",
-                      overflow: "hidden",
-                    }}
-                  >
-                    <Image
-                      src={img.image_url}
-                      alt={`${item.name} – free item on Deklata`}
-                      fill
-                      sizes="(max-width: 1024px) 100vw, 55vw"
-                      style={{ objectFit: "cover" }}
-                      priority={img === images[0]}
-                    />
-                  </div>
-                ))
-              ) : (
-                <div
-                  style={{
-                    width: "100%",
-                    aspectRatio: "4 / 3",
-                    maxHeight: "55vh",
-                    background: "var(--green-50)",
-                    borderRadius: 20,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 12,
-                    color: "var(--ink-300)",
-                  }}
-                >
-                  <span style={{ fontSize: 48 }}>📷</span>
-                  <span
-                    style={{ fontFamily: "var(--font-body)", fontSize: 14 }}
-                  >
-                    No photos yet
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {images.length > 1 && (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "center",
-                  gap: 6,
-                  marginTop: 12,
-                }}
-              >
-                {images.map((_, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      width: i === activeIndex ? 20 : 6,
-                      height: 6,
-                      borderRadius: 999,
-                      background:
-                        i === activeIndex
-                          ? "var(--green-800)"
-                          : "var(--ink-100)",
-                      transition: "all 0.2s ease",
-                    }}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* RIGHT — DETAILS */}
-          <div
-            style={{
-              background: "var(--white)",
-              borderRadius: 20,
-              padding: "clamp(16px, 4vw, 24px)",
-              boxShadow: "var(--shadow-card)",
-              border: "1px solid var(--ink-100)",
-            }}
-          >
-            <span
-              style={{
-                display: "inline-block",
-                background: "var(--gold)",
-                color: "var(--white)",
-                padding: "4px 12px",
-                borderRadius: 999,
-                fontSize: 12,
-                fontWeight: 700,
-                letterSpacing: "0.5px",
-                fontFamily: "var(--font-display)",
-                marginBottom: 14,
-              }}
-            >
-              FREE
-            </span>
-
-            <h1
-              style={{
-                fontSize: "clamp(20px, 5vw, 26px)",
-                fontWeight: 800,
-                marginBottom: 8,
-                lineHeight: 1.2,
-              }}
-            >
-              {item.name}
-            </h1>
-
-            <div
-              style={{
-                display: "flex",
-                gap: 8,
-                flexWrap: "wrap",
-                marginBottom: 20,
-              }}
-            >
-              <span className="meta-pill">
-                {item.categories?.name || "Uncategorized"}
-              </span>
-              {item.condition && (
-                <span
-                  className="meta-pill"
-                  style={{
-                    background: "#eff6ff",
-                    color: "#1d4ed8",
-                    borderColor: "#bfdbfe",
-                  }}
-                >
-                  🏷️ {item.condition}
-                </span>
-              )}
-              {item.pickup_location && (
-                <span
-                  className="meta-pill"
-                  style={{
-                    background: "var(--gold-light)",
-                    color: "#92400e",
-                    borderColor: "#fde68a",
-                  }}
-                >
-                  📍 {item.pickup_location}
-                </span>
-              )}
-            </div>
-
-            <div style={{ marginBottom: 24 }}>
-              <p
-                style={{
-                  fontSize: 15,
-                  color: "var(--ink-700)",
-                  lineHeight: 1.7,
-                  marginBottom: 8,
-                  fontFamily: "var(--font-body)",
-                  display: "-webkit-box",
-                  WebkitLineClamp: showFullDescription ? ("unset" as any) : 3,
-                  WebkitBoxOrient: "vertical" as any,
-                  overflow: "hidden",
-                }}
-              >
-                {item.description}
-              </p>
-
-              {item.description?.length > 160 && (
-                <button
-                  onClick={() => setShowFullDescription((v) => !v)}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "var(--green-700)",
-                    fontWeight: 600,
-                    padding: 0,
-                    cursor: "pointer",
-                    fontSize: 14,
-                    fontFamily: "var(--font-body)",
-                  }}
-                >
-                  {showFullDescription ? "Show less ↑" : "Read more ↓"}
-                </button>
-              )}
-            </div>
-
-            {requestSuccess && (
-              <div
-                style={{
-                  marginBottom: 16,
-                  padding: "12px 16px",
-                  background: "var(--green-50)",
-                  color: "var(--green-800)",
-                  borderRadius: 12,
-                  fontWeight: 700,
-                  textAlign: "center",
-                  fontSize: 14,
-                  fontFamily: "var(--font-body)",
-                  border: "1px solid var(--green-100)",
-                  animation: "fadeIn 0.3s ease",
-                }}
-              >
-                🎉 Request sent! The owner will be notified.
-              </div>
-            )}
-
-            {!isOwner && isLoggedIn && hasRequested && !requestSuccess && (
-              <div
-                style={{
-                  marginBottom: 20,
-                  padding: "12px 16px",
-                  background: "var(--green-50)",
-                  color: "var(--green-800)",
-                  borderRadius: 12,
-                  fontWeight: 600,
-                  textAlign: "center",
-                  fontSize: 14,
-                  fontFamily: "var(--font-body)",
-                  border: "1px solid var(--green-100)",
-                }}
-              >
-                ✅ You've requested this item — check My Requests for updates
-              </div>
-            )}
-
-            <div style={{ display: "grid", gap: 12 }}>
-              {!isOwner && !isLoggedIn && (
-                <button
-                  onClick={() => router.push(`/login?redirect=/item/${id}`)}
-                  className="btn-primary"
-                >
-                  Log in to request
-                </button>
-              )}
-              {!isOwner && isLoggedIn && !hasRequested && (
-                <button
-                  onClick={requestItem}
-                  disabled={requesting}
-                  className="btn-primary"
-                  style={{ opacity: requesting ? 0.7 : 1 }}
-                >
-                  {requesting ? "Requesting…" : "Request this item"}
-                </button>
-              )}
-              {isOwner && (
-                <button onClick={deleteItem} className="btn-danger">
-                  Delete item
-                </button>
-              )}
-              {/* WhatsApp Share */}
-              <a
-                href={whatsappUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                  padding: "12px",
-                  borderRadius: 14,
-                  border: "1.5px solid #22c55e",
-                  background: "#f0fdf4",
-                  color: "#16a34a",
-                  fontWeight: 700,
-                  fontSize: 14,
-                  textDecoration: "none",
-                  fontFamily: "var(--font-display)",
-                }}
-              >
-                <span>💬</span> Share on WhatsApp
-              </a>
-            </div>
-
-            {/* Report item */}
-            <div style={{ marginTop: 8, textAlign: "center" }}>
-              <Link
-                href={`/contact?type=complaint&subject=Report+item+${id}`}
-                style={{
-                  fontSize: 12,
-                  color: "var(--ink-300)",
-                  fontFamily: "var(--font-body)",
-                  textDecoration: "underline",
-                }}
-              >
-                🚩 Report this item
-              </Link>
-            </div>
-
-            {/* Campus + fresh badge */}
-            <div
-              style={{
-                display: "flex",
-                gap: 8,
-                flexWrap: "wrap",
-                marginTop: 16,
-              }}
-            >
-              {item.campus && (
-                <span className="meta-pill" style={{ fontSize: 12 }}>
-                  🏫 {item.campus}
-                </span>
-              )}
-              {isFreshToday && (
-                <span
-                  style={{
-                    padding: "4px 12px",
-                    borderRadius: 999,
-                    fontSize: 11,
-                    fontWeight: 700,
-                    background: "#dcfce7",
-                    color: "#16a34a",
-                    fontFamily: "var(--font-display)",
-                  }}
-                >
-                  ✨ NEW TODAY
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <style jsx>{`
-          @media (min-width: 1024px) {
-            .detail-grid {
-              grid-template-columns: 1.3fr 1fr !important;
-              align-items: start;
-            }
-          }
-        `}</style>
-      </main>
+      {/*
+        ItemActions is the ONLY client component on this page.
+        It receives all data as props — no client-side Supabase fetches
+        needed for the initial render. Auth + request status loads
+        after the page is already visible.
+      */}
+      <ItemActions item={item} images={images} itemId={id} backUrl={backUrl} />
     </>
   );
 }
