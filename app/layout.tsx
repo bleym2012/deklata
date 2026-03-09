@@ -26,6 +26,7 @@ import Header from "./components/Header";
 import Footer from "./components/Footer";
 import PWAInstallBanner from "./components/PWAInstallBanner";
 import ServiceWorkerRegistrar from "./components/ServiceWorkerRegistrar";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 // ── FONTS — self-hosted via next/font ────────────────────────────────────────
 // These download at build time and serve from Vercel CDN.
@@ -215,9 +216,11 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <Header />
-        <div className="page-container">{children}</div>
-        <Footer />
+        <ErrorBoundary>
+          <Header />
+          <div className="page-container">{children}</div>
+          <Footer />
+        </ErrorBoundary>
         <PWAInstallBanner />
         <ServiceWorkerRegistrar />
 

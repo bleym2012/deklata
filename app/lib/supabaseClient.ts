@@ -10,3 +10,18 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true,
   },
 });
+
+// Silently redirect to login on session expiry
+// instead of throwing an unhandled error that crashes the app
+supabase.auth.onAuthStateChange((event) => {
+  if (event === "TOKEN_REFRESHED") return;
+  if (event === "SIGNED_OUT") {
+    if (
+      typeof window !== "undefined" &&
+      !window.location.pathname.startsWith("/login") &&
+      !window.location.pathname.startsWith("/register")
+    ) {
+      window.location.href = "/login";
+    }
+  }
+});
