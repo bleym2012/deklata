@@ -22,6 +22,26 @@ export default function OwnerDashboard() {
   useEffect(() => {
     checkAuth();
   }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    // Realtime: re-fetch when any request row changes (requester confirms, etc.)
+    const channel = supabase
+      .channel("dashboard-requests")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "requests" },
+        () => {
+          loadRequests(userId);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
   useEffect(() => {
     if (userId && tab === "myitems") loadMyItems();
   }, [tab, userId]);
@@ -101,7 +121,7 @@ export default function OwnerDashboard() {
       `,
       )
       .eq("items.owner_id", uid)
-      .in("status", ["pending", "approved"])
+      .in("status", ["pending", "approved", "completed"])
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -588,12 +608,15 @@ export default function OwnerDashboard() {
                               style={{
                                 marginTop: 12,
                                 fontSize: 14,
-                                color: "var(--green-700)",
+                                color: req.requester_confirmed
+                                  ? "var(--green-800)"
+                                  : "var(--ink-500)",
                                 fontWeight: 600,
                               }}
                             >
-                              ✅ You've confirmed giving this item. Waiting for
-                              receiver confirmation.
+                              {req.requester_confirmed
+                                ? "🎉 Both confirmed — exchange complete!"
+                                : "✅ You've confirmed giving this item. Waiting for receiver confirmation."}
                             </p>
                           )}
                           {item.is_completed && (
