@@ -17,84 +17,74 @@ export default function AddItemPage() {
   const [images, setImages] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [fileInputKey, setFileInputKey] = useState(Date.now());
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [compressing, setCompressing] = useState(false);
   const [condition, setCondition] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [authChecking, setAuthChecking] = useState(true);
 
-  // Store campus + userId from initial auth check so handleSubmit
-  // never needs to re-fetch them — saves ~800ms on every submission.
+  // Cached from initial load — handleSubmit never re-fetches these
   const [cachedUserId, setCachedUserId] = useState<string | null>(null);
   const [cachedCampus, setCachedCampus] = useState<string | null>(null);
 
+  // Form is shown immediately — no authChecking skeleton.
+  // Auth check + categories load in the background.
+  // If not logged in, redirect fires before they can submit.
+  const [formReady, setFormReady] = useState(false);
+
   useEffect(() => {
-    checkUser();
+    init();
   }, []);
 
-  async function checkUser() {
-    // ── OPTIMISATION 1: fire all 3 requests in parallel ──────────────────
-    // Previously: getUser → wait → profiles → wait → categories
-    // Now:        all three fire simultaneously, page opens 2× faster
+  async function init() {
+    // Fire auth + categories in parallel — both resolve from cache/edge fast
     const [
       {
-        data: { user },
+        data: { session },
       },
       { data: categoriesData },
     ] = await Promise.all([
-      supabase.auth.getUser(),
+      supabase.auth.getSession(),
       supabase
         .from("categories")
         .select("id, name")
         .order("name", { ascending: true }),
     ]);
 
-    if (!user) {
+    if (!session?.user) {
       router.push("/login");
       return;
     }
 
-    // Profile fetch runs in parallel with categories above via getUser
-    // but we need the user id first — fetch profile now (already have user)
-    const { data: profileData } = await supabase
+    // Profile check — needs user.id, runs after we have it
+    const { data: profile } = await supabase
       .from("profiles")
       .select("campus, phone")
-      .eq("id", user.id)
+      .eq("id", session.user.id)
       .single();
 
-    const profile = profileData as {
-      campus: string | null;
-      phone: string | null;
-    } | null;
+    const p = profile as { campus: string | null; phone: string | null } | null;
     const noCampus =
-      !profile ||
-      !profile.campus ||
-      profile.campus === "Not specified" ||
-      profile.campus.trim() === "";
-    const noPhone = !profile || !profile.phone || profile.phone.trim() === "";
-
+      !p || !p.campus || p.campus === "Not specified" || p.campus.trim() === "";
+    const noPhone = !p || !p.phone || p.phone.trim() === "";
     if (noCampus || noPhone) {
       router.push("/onboarding");
       return;
     }
 
-    // Cache user id and campus — handleSubmit reuses these, never re-fetches
-    setCachedUserId(user.id);
-    setCachedCampus(profile?.campus ?? null);
-
+    setCachedUserId(session.user.id);
+    setCachedCampus(p?.campus ?? null);
     if (categoriesData) setCategories(categoriesData);
-    setAuthChecking(false);
+    setFormReady(true);
   }
 
   async function compressImage(file: File): Promise<File> {
     return new Promise((resolve) => {
       const MAX_SIZE = 1024 * 1024;
       const MAX_DIM = 1400;
-
       if (file.size <= MAX_SIZE) {
         resolve(file);
         return;
       }
-
       const img = new Image();
       const url = URL.createObjectURL(file);
       img.onload = () => {
@@ -120,11 +110,12 @@ export default function AddItemPage() {
             } else {
               canvas.toBlob(
                 (blob2) => {
-                  const final = blob2 || blob1 || file;
                   resolve(
-                    new File([final], file.name.replace(/\.[^.]+$/, ".jpg"), {
-                      type: "image/jpeg",
-                    }),
+                    new File(
+                      [blob2 || blob1 || file],
+                      file.name.replace(/\.[^.]+$/, ".jpg"),
+                      { type: "image/jpeg" },
+                    ),
                   );
                 },
                 "image/jpeg",
@@ -143,12 +134,11 @@ export default function AddItemPage() {
 
   async function handleImageSelect(files: FileList) {
     const selected = Array.from(files).slice(0, 3);
-    setLoading(true);
-    // ── OPTIMISATION 2: compress all images in parallel ───────────────────
+    setCompressing(true);
     const compressed = await Promise.all(selected.map(compressImage));
     setImages(compressed);
     setPreviewUrls(compressed.map((f) => URL.createObjectURL(f)));
-    setLoading(false);
+    setCompressing(false);
   }
 
   function removeImage(index: number) {
@@ -161,21 +151,12 @@ export default function AddItemPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
+    if (!cachedUserId) return;
+    setSubmitting(true);
     setError(null);
 
-    // ── OPTIMISATION 3: use cached user id + campus ───────────────────────
-    // Previously: getUser() + profiles.select() = ~800ms every submission
-    // Now: both values stored from page load, zero extra network calls
-    if (!cachedUserId) {
-      setError("You must be logged in");
-      setLoading(false);
-      return;
-    }
-
-    // ── OPTIMISATION 4: insert item immediately with cached campus ────────
-    // Previously: getUser → wait → profiles → wait → insert
-    // Now: insert fires instantly using cached values
+    // Insert item immediately — no pre-flight auth calls, userId+campus
+    // are already in state from init(). Saves ~800ms every submission.
     const { data: item, error: itemError } = await supabase
       .from("items")
       .insert({
@@ -193,14 +174,13 @@ export default function AddItemPage() {
 
     if (itemError || !item) {
       setError(itemError?.message || "Failed to create item");
-      setLoading(false);
+      setSubmitting(false);
       return;
     }
 
+    // Upload all images in parallel — was sequential for loop (6s for 3 images)
+    // Now all fire simultaneously = time of slowest single upload (~2s)
     if (images.length > 0) {
-      // ── OPTIMISATION 5: upload ALL images in parallel ─────────────────
-      // Previously: sequential for loop — image 2 waits for image 1 to finish
-      // 3 images at 2s each = 6s. Now all 3 fire simultaneously = 2s total.
       await Promise.all(
         images.map(async (image) => {
           const ext = image.name.split(".").pop()?.toLowerCase() || "jpg";
@@ -215,7 +195,6 @@ export default function AddItemPage() {
           const publicUrl = supabase.storage
             .from("item-images")
             .getPublicUrl(filePath).data.publicUrl;
-          // ── OPTIMISATION 6: all item_images inserts also fire in parallel
           await supabase
             .from("item_images")
             .insert({ item_id: item.id, image_url: publicUrl });
@@ -226,7 +205,10 @@ export default function AddItemPage() {
     router.push("/");
   }
 
-  if (authChecking)
+  const isLoading = submitting || compressing;
+
+  // Show skeleton while auth+categories load in background
+  if (!formReady) {
     return (
       <main
         style={{
@@ -242,6 +224,7 @@ export default function AddItemPage() {
         <div className="skeleton" style={{ height: 500, borderRadius: 20 }} />
       </main>
     );
+  }
 
   return (
     <main
@@ -379,7 +362,6 @@ export default function AddItemPage() {
             />
           </div>
 
-          {/* IMAGE UPLOAD */}
           <div>
             <label style={labelStyle}>
               Photos{" "}
@@ -401,6 +383,7 @@ export default function AddItemPage() {
             <button
               type="button"
               onClick={() => document.getElementById("image-upload")?.click()}
+              disabled={compressing}
               style={{
                 padding: "16px",
                 width: "100%",
@@ -411,17 +394,17 @@ export default function AddItemPage() {
                 fontFamily: "var(--font-body)",
                 fontWeight: 500,
                 fontSize: 14,
-                cursor: "pointer",
+                cursor: compressing ? "wait" : "pointer",
                 transition: "all 0.15s ease",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 gap: 8,
+                opacity: compressing ? 0.7 : 1,
               }}
             >
-              📸 Choose photos
+              {compressing ? "⏳ Compressing…" : "📸 Choose photos"}
             </button>
-
             {previewUrls.length > 0 && (
               <div
                 style={{
@@ -473,11 +456,11 @@ export default function AddItemPage() {
           </div>
 
           <button
-            disabled={loading}
+            disabled={isLoading}
             className="btn-primary"
-            style={{ marginTop: 8 }}
+            style={{ marginTop: 8, opacity: isLoading ? 0.7 : 1 }}
           >
-            {loading ? "Posting your item…" : "Post item for free"}
+            {submitting ? "Posting your item…" : "Post item for free"}
           </button>
 
           {error && (
