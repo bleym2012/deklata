@@ -222,7 +222,7 @@ export default function Header() {
         position: "sticky",
         top: 0,
         zIndex: 100,
-        background: "rgba(250,249,246,0.95)",
+        background: "var(--filter-bar-bg)",
         backdropFilter: "blur(12px)",
         WebkitBackdropFilter: "blur(12px)",
         borderBottom: "1px solid var(--ink-100)",
@@ -337,7 +337,7 @@ export default function Header() {
             display: "flex",
             flexDirection: "column",
             gap: 6,
-            background: "var(--cream)",
+            background: "var(--filter-bar-bg)",
             animation: "header-slideDown 0.18s ease",
           }}
         >

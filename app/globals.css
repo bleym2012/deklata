@@ -1,6 +1,4 @@
-/* Google Fonts @import REMOVED — next/font in layout.tsx self-hosts
-   fonts at build time. The --font-display and --font-body CSS variables
-   are now injected by next/font via className on <html>. */
+@import url("https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap");
 @import "tailwindcss";
 
 /* ================================
@@ -30,6 +28,7 @@
 
   /* SEMANTIC TOKENS */
   --background: var(--cream);
+  --filter-bar-bg: rgba(250, 249, 246, 0.95); /* frosted glass — light */
   --foreground: var(--ink-900);
   --card-bg: var(--white);
   --card-border: var(--ink-100);
@@ -612,6 +611,7 @@ select {
   :root {
     /* Dark palette */
     --background: #0d1a12; /* deep forest black */
+    --filter-bar-bg: rgba(13, 26, 18, 0.95); /* frosted glass — dark */
     --foreground: #e8ede9; /* warm off-white */
     --card-bg: #152019; /* slightly lighter than bg */
     --card-border: #243328; /* subtle green-tinted border */

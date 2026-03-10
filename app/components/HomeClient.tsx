@@ -306,7 +306,7 @@ export default function HomeClient({
           position: "sticky",
           top: 64,
           zIndex: 50,
-          background: "rgba(250,249,246,0.95)",
+          background: "var(--filter-bar-bg)",
           backdropFilter: "blur(10px)",
           WebkitBackdropFilter: "blur(10px)",
           paddingTop: 16,
