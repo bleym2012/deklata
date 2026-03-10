@@ -1,10 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabaseClient";
 
 type Category = { id: string; name: string };
+
+// Categories are the same for every user — cache them in module scope
+// so revisiting the page is instant (no re-fetch ever).
+let categoriesCache: Category[] | null = null;
 
 export default function AddItemPage() {
   const router = useRouter();
@@ -13,7 +17,9 @@ export default function AddItemPage() {
   const [categoryId, setCategoryId] = useState("");
   const [categoryName, setCategoryName] = useState("");
   const [pickupLocation, setPickupLocation] = useState("");
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<Category[]>(
+    categoriesCache || [],
+  );
   const [images, setImages] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [fileInputKey, setFileInputKey] = useState(Date.now());
@@ -22,60 +28,61 @@ export default function AddItemPage() {
   const [condition, setCondition] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  // Cached from initial load — handleSubmit never re-fetches these
-  const [cachedUserId, setCachedUserId] = useState<string | null>(null);
-  const [cachedCampus, setCachedCampus] = useState<string | null>(null);
-
-  // Form is shown immediately — no authChecking skeleton.
-  // Auth check + categories load in the background.
-  // If not logged in, redirect fires before they can submit.
-  const [formReady, setFormReady] = useState(false);
+  // Refs so handleSubmit can read them without stale closure issues
+  const userIdRef = useRef<string | null>(null);
+  const campusRef = useRef<string | null>(null);
+  const readyRef = useRef(false);
 
   useEffect(() => {
-    init();
+    supabase.auth.getSession().then(({ data }) => {
+      const user = data.session?.user;
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+      userIdRef.current = user.id;
+
+      // Fire categories + profile fetch in parallel
+      const catPromise = categoriesCache
+        ? Promise.resolve(categoriesCache)
+        : supabase
+            .from("categories")
+            .select("id, name")
+            .order("name", { ascending: true })
+            .then(({ data }) => {
+              if (data) {
+                categoriesCache = data;
+              }
+              return data || [];
+            });
+
+      const profilePromise = supabase
+        .from("profiles")
+        .select("campus, phone")
+        .eq("id", user.id)
+        .single()
+        .then(
+          ({ data }) =>
+            data as { campus: string | null; phone: string | null } | null,
+        );
+
+      Promise.all([catPromise, profilePromise]).then(([cats, profile]) => {
+        const noCampus =
+          !profile?.campus ||
+          profile.campus === "Not specified" ||
+          profile.campus.trim() === "";
+        const noPhone = !profile?.phone || profile.phone.trim() === "";
+        if (noCampus || noPhone) {
+          router.push("/onboarding");
+          return;
+        }
+
+        campusRef.current = profile?.campus ?? null;
+        readyRef.current = true;
+        if (cats.length > 0) setCategories(cats);
+      });
+    });
   }, []);
-
-  async function init() {
-    // Fire auth + categories in parallel — both resolve from cache/edge fast
-    const [
-      {
-        data: { session },
-      },
-      { data: categoriesData },
-    ] = await Promise.all([
-      supabase.auth.getSession(),
-      supabase
-        .from("categories")
-        .select("id, name")
-        .order("name", { ascending: true }),
-    ]);
-
-    if (!session?.user) {
-      router.push("/login");
-      return;
-    }
-
-    // Profile check — needs user.id, runs after we have it
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("campus, phone")
-      .eq("id", session.user.id)
-      .single();
-
-    const p = profile as { campus: string | null; phone: string | null } | null;
-    const noCampus =
-      !p || !p.campus || p.campus === "Not specified" || p.campus.trim() === "";
-    const noPhone = !p || !p.phone || p.phone.trim() === "";
-    if (noCampus || noPhone) {
-      router.push("/onboarding");
-      return;
-    }
-
-    setCachedUserId(session.user.id);
-    setCachedCampus(p?.campus ?? null);
-    if (categoriesData) setCategories(categoriesData);
-    setFormReady(true);
-  }
 
   async function compressImage(file: File): Promise<File> {
     return new Promise((resolve) => {
@@ -151,22 +158,26 @@ export default function AddItemPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!cachedUserId) return;
+    const userId = userIdRef.current;
+    const campus = campusRef.current;
+    if (!userId) {
+      setError("Still loading, please try again");
+      return;
+    }
     setSubmitting(true);
     setError(null);
 
-    // Insert item immediately — no pre-flight auth calls, userId+campus
-    // are already in state from init(). Saves ~800ms every submission.
+    // Insert item + upload images in one shot — no pre-flight auth calls
     const { data: item, error: itemError } = await supabase
       .from("items")
       .insert({
-        owner_id: cachedUserId,
+        owner_id: userId,
         name,
         description,
         category_id: categoryId,
         category_name: categoryName,
         pickup_location: pickupLocation,
-        campus: cachedCampus,
+        campus,
         condition,
       })
       .select()
@@ -178,8 +189,7 @@ export default function AddItemPage() {
       return;
     }
 
-    // Upload all images in parallel — was sequential for loop (6s for 3 images)
-    // Now all fire simultaneously = time of slowest single upload (~2s)
+    // All images upload in parallel — not sequential
     if (images.length > 0) {
       await Promise.all(
         images.map(async (image) => {
@@ -206,25 +216,6 @@ export default function AddItemPage() {
   }
 
   const isLoading = submitting || compressing;
-
-  // Show skeleton while auth+categories load in background
-  if (!formReady) {
-    return (
-      <main
-        style={{
-          maxWidth: 580,
-          margin: "clamp(16px, 4vw, 40px) auto",
-          padding: "0 20px 60px",
-        }}
-      >
-        <div
-          className="skeleton"
-          style={{ height: 32, width: "40%", marginBottom: 24 }}
-        />
-        <div className="skeleton" style={{ height: 500, borderRadius: 20 }} />
-      </main>
-    );
-  }
 
   return (
     <main
@@ -320,11 +311,15 @@ export default function AddItemPage() {
               className="form-input"
             >
               <option value="">Select a category</option>
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.name}
-                </option>
-              ))}
+              {categories.length === 0 ? (
+                <option disabled>Loading…</option>
+              ) : (
+                categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))
+              )}
             </select>
           </div>
 
