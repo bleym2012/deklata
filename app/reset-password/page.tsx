@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabaseClient";
 
@@ -12,22 +12,45 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [done, setDone] = useState(false);
+  const readyRef = useRef(false);
 
   useEffect(() => {
-    // Supabase puts the recovery token in the URL hash as:
-    // /reset-password#access_token=xxx&type=recovery
-    // We must intercept this BEFORE the rest of the app acts on it.
-    // onAuthStateChange fires PASSWORD_RECOVERY specifically for reset links —
-    // we wait for that event to confirm this is a genuine reset flow, then
-    // show the form. If the event is SIGNED_IN instead (user is already
-    // logged in normally), we redirect them away — they shouldn't be here.
+    // RACE CONDITION FIX:
+    // detectSessionInUrl:true in supabaseClient processes the #access_token
+    // hash the instant the JS module loads — often BEFORE this component
+    // mounts and sets up onAuthStateChange. So we handle both cases:
+    //
+    // Case 1: Token already processed before mount
+    //   → getSession() will return an active session, setReady(true)
+    //
+    // Case 2: Token processed after mount
+    //   → onAuthStateChange fires PASSWORD_RECOVERY, setReady(true)
+    //
+    // Case 3: SIGNED_IN fires (already logged in, not a reset flow)
+    //   → wait 500ms to give PASSWORD_RECOVERY a chance, then redirect
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) {
+        // Session exists — either recovery token was already exchanged,
+        // or user is already logged in. Either way, show the form.
+        // If they were already logged in without a recovery token,
+        // updateUser() will still work — no harm done.
+        readyRef.current = true;
+        setReady(true);
+      }
+    });
+
     const { data: listener } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY") {
-        // Token is valid, session is established, show the form
+        readyRef.current = true;
         setReady(true);
       } else if (event === "SIGNED_IN") {
-        // Normal login — not a reset flow, redirect home
-        router.replace("/");
+        // Wait briefly — PASSWORD_RECOVERY may still be coming
+        setTimeout(() => {
+          if (!readyRef.current) {
+            router.replace("/");
+          }
+        }, 800);
       }
     });
 
@@ -57,13 +80,11 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    // Sign out after reset so user logs in fresh with new password
     await supabase.auth.signOut();
     setDone(true);
     setTimeout(() => router.replace("/login"), 2500);
   }
 
-  // Waiting for recovery token to be processed
   if (!ready && !done) {
     return (
       <main style={styles.page}>
@@ -85,7 +106,6 @@ export default function ResetPasswordPage() {
     );
   }
 
-  // Success state
   if (done) {
     return (
       <main style={styles.page}>
@@ -148,7 +168,7 @@ export default function ResetPasswordPage() {
         <form onSubmit={handleUpdate} style={{ display: "grid", gap: 12 }}>
           <input
             type="password"
-            placeholder="New password"
+            placeholder="New password (min. 8 characters)"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
