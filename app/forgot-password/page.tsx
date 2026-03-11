@@ -17,14 +17,16 @@ export default function ForgotPasswordPage() {
     setMessage(null);
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      // Point to the auth confirm route which safely exchanges the token
+      // and redirects to reset-password — avoids the auto-login race condition
+      redirectTo: `${window.location.origin}/auth/confirm`,
     });
 
     if (error) {
       setError(error.message);
     } else {
       setMessage(
-        "If this email exists, a password reset link has been sent."
+        "If this email exists, a password reset link has been sent. Check your inbox.",
       );
     }
 
@@ -39,18 +41,18 @@ export default function ForgotPasswordPage() {
         alignItems: "center",
         justifyContent: "center",
         padding: 20,
-        background: "#f9fafb",
-        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont",
+        background: "var(--background)",
       }}
     >
       <div
         style={{
           width: "100%",
           maxWidth: 380,
-          background: "#fff",
+          background: "var(--card-bg)",
           borderRadius: 18,
           padding: "28px 24px",
-          boxShadow: "0 20px 40px rgba(0,0,0,0.08)",
+          boxShadow: "var(--shadow-modal)",
+          border: "1px solid var(--card-border)",
         }}
       >
         <h1
@@ -59,66 +61,63 @@ export default function ForgotPasswordPage() {
             fontWeight: 700,
             marginBottom: 8,
             textAlign: "center",
+            color: "var(--ink-900)",
+            fontFamily: "var(--font-display)",
           }}
         >
           Forgot your password?
         </h1>
-
         <p
           style={{
             fontSize: 14,
-            color: "#555",
+            color: "var(--ink-500)",
             textAlign: "center",
             marginBottom: 22,
+            fontFamily: "var(--font-body)",
           }}
         >
-          Enter your email and we’ll send you a reset link.
+          Enter your email and we'll send you a reset link.
         </p>
 
-        <form onSubmit={handleReset}>
+        <form onSubmit={handleReset} style={{ display: "grid", gap: 12 }}>
           <input
             type="email"
             placeholder="Email address"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            style={{
-              width: "100%",
-              padding: "12px 14px",
-              borderRadius: 12,
-              border: "1px solid #d1d5db",
-              marginBottom: 14,
-              fontSize: 14,
-            }}
+            className="form-input"
           />
-
           <button
             disabled={loading}
-            style={{
-              width: "100%",
-              padding: "12px",
-              borderRadius: 12,
-              border: "none",
-              background: "#2563eb",
-              color: "#fff",
-              fontWeight: 600,
-              fontSize: 15,
-              cursor: "pointer",
-              opacity: loading ? 0.7 : 1,
-            }}
+            className="btn-primary"
+            style={{ opacity: loading ? 0.7 : 1 }}
           >
             {loading ? "Sending…" : "Send reset link"}
           </button>
         </form>
 
         {error && (
-          <p style={{ color: "#dc2626", marginTop: 14, fontSize: 14 }}>
+          <p
+            style={{
+              color: "#dc2626",
+              marginTop: 14,
+              fontSize: 14,
+              fontFamily: "var(--font-body)",
+            }}
+          >
             {error}
           </p>
         )}
-
         {message && (
-          <p style={{ color: "#15803d", marginTop: 14, fontSize: 14 }}>
+          <p
+            style={{
+              color: "#15803d",
+              marginTop: 14,
+              fontSize: 14,
+              fontFamily: "var(--font-body)",
+            }}
+          >
             {message}
           </p>
         )}
@@ -128,9 +127,10 @@ export default function ForgotPasswordPage() {
             marginTop: 20,
             fontSize: 14,
             textAlign: "center",
+            fontFamily: "var(--font-body)",
           }}
         >
-          <Link href="/login" style={{ color: "#2563eb" }}>
+          <Link href="/login" style={{ color: "var(--green-800)" }}>
             Back to login
           </Link>
         </p>
