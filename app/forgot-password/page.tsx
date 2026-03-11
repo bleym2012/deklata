@@ -1,3 +1,5 @@
+// app/forgot-password/page.tsx — no changes needed to logic
+// redirectTo must point to /auth/callback which exchanges the PKCE code
 "use client";
 
 import { useState } from "react";
@@ -17,19 +19,19 @@ export default function ForgotPasswordPage() {
     setMessage(null);
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      // Point to the auth confirm route which safely exchanges the token
-      // and redirects to reset-password — avoids the auto-login race condition
-      redirectTo: `${window.location.origin}/auth/confirm`,
+      // PKCE: Supabase will send a link with ?code= to this URL.
+      // /auth/callback exchanges the code server-side and redirects
+      // to /reset-password only after confirming it is a recovery type.
+      redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
     });
 
     if (error) {
       setError(error.message);
     } else {
       setMessage(
-        "If this email exists, a password reset link has been sent. Check your inbox.",
+        "Check your inbox — a reset link has been sent. It may take a minute.",
       );
     }
-
     setLoading(false);
   }
 

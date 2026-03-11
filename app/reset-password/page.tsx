@@ -1,8 +1,21 @@
+// app/reset-password/page.tsx
+//
+// The user arrives here ONLY after /auth/callback has:
+//   1. Verified the PKCE code is genuine
+//   2. Confirmed it is a recovery token (not a regular login)
+//   3. Set a short-lived httpOnly cookie with the recovery access_token
+//
+// This page reads that cookie via a small API route, uses the token to
+// call updateUser(), then clears the cookie and signs the user out so
+// they must log in fresh with their new password.
+//
+// The Supabase JS client on this page operates with the recovery token
+// only — not a full persistent session. The user is never "logged in".
+
 "use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "../lib/supabaseClient";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -10,19 +23,21 @@ export default function ResetPasswordPage() {
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(false); // cookie verified
   const [done, setDone] = useState(false);
 
   useEffect(() => {
-    // Session was already established by /auth/confirm route handler.
-    // Just verify a session exists — if not, the link was invalid.
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
-        setReady(true);
-      } else {
-        router.replace("/forgot-password?error=session-expired");
-      }
-    });
+    // Verify the recovery cookie exists via our API route.
+    // If it doesn't, the user got here without a valid reset link.
+    fetch("/api/auth/verify-recovery")
+      .then((r) => {
+        if (r.ok) {
+          setReady(true);
+        } else {
+          router.replace("/forgot-password?error=invalid-or-expired");
+        }
+      })
+      .catch(() => router.replace("/forgot-password?error=invalid-or-expired"));
   }, [router]);
 
   async function handleUpdate(e: React.FormEvent) {
@@ -40,16 +55,22 @@ export default function ResetPasswordPage() {
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.updateUser({ password });
+    // Call our API route which uses the recovery token from the httpOnly
+    // cookie to update the password — the client never touches the token.
+    const res = await fetch("/api/auth/update-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    });
 
-    if (error) {
-      setError(error.message);
+    const data = await res.json();
+
+    if (!res.ok) {
+      setError(data.error || "Failed to update password. Please try again.");
       setLoading(false);
       return;
     }
 
-    // Sign out so user logs in fresh with new password
-    await supabase.auth.signOut();
     setDone(true);
     setTimeout(() => router.replace("/login"), 2500);
   }
