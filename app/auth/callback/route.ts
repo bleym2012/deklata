@@ -1,76 +1,69 @@
 // app/auth/callback/route.ts
 //
-// PKCE code exchange for ALL auth flows.
-// Recovery → sets httpOnly cookie, goes to /reset-password (no session)
-// OAuth/email → redirects to /auth/complete which exchanges code client-side
+// Supabase password reset emails send:
+//   /auth/callback?token_hash=xxx&type=recovery
+//
+// We exchange the token_hash server-side using the /auth/v1/verify endpoint,
+// confirm it's a recovery type, then set a short-lived httpOnly cookie and
+// redirect to /reset-password. The browser never sees the raw token so the
+// Supabase JS client cannot auto-establish a session.
 
 import { NextRequest, NextResponse } from "next/server";
 
-const ALLOWED_NEXT = ["/", "/onboarding", "/dashboard", "/reset-password"];
-
-function safeNext(next: string | null): string {
-  if (!next) return "/";
-  const decoded = decodeURIComponent(next);
-  if (
-    decoded.startsWith("/") &&
-    ALLOWED_NEXT.some((p) => decoded.startsWith(p))
-  )
-    return decoded;
-  return "/";
-}
-
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
-  const code = searchParams.get("code");
-  const next = safeNext(searchParams.get("next"));
+  const token_hash = searchParams.get("token_hash");
+  const type = searchParams.get("type");
 
-  if (!code) {
+  // Reject anything that isn't a recovery link
+  if (!token_hash || type !== "recovery") {
     return NextResponse.redirect(
-      `${origin}/forgot-password?error=missing-code`,
+      `${origin}/forgot-password?error=invalid-link`,
     );
   }
 
-  // Exchange code server-side to inspect the token type
-  const exchangeRes = await fetch(
-    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/token?grant_type=pkce`,
+  // Exchange token_hash for a session via Supabase REST API.
+  // No extra packages needed — plain fetch.
+  const verifyRes = await fetch(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/verify`,
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       },
-      body: JSON.stringify({ auth_code: code }),
+      body: JSON.stringify({ token_hash, type: "recovery" }),
     },
   );
 
-  if (!exchangeRes.ok) {
+  if (!verifyRes.ok) {
+    // Expired or already-used token
     return NextResponse.redirect(
       `${origin}/forgot-password?error=expired-link`,
     );
   }
 
-  const data = await exchangeRes.json();
-  const isRecovery = data?.type === "recovery";
+  const data = await verifyRes.json();
+  const accessToken = data?.access_token;
 
-  if (isRecovery) {
-    // Recovery: cookie-only, no session, redirect to password form
-    const response = NextResponse.redirect(`${origin}/reset-password`);
-    response.cookies.set("sb-recovery-token", data.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 600,
-      path: "/", // "/" so /api/auth/* routes can read it
-    });
-    return response;
+  if (!accessToken) {
+    return NextResponse.redirect(
+      `${origin}/forgot-password?error=invalid-token`,
+    );
   }
 
-  // OAuth / email confirmation: redirect to client-side page that
-  // calls supabase.auth.exchangeCodeForSession(code) properly.
-  // We pass the code and next destination as query params.
-  // This lets Supabase JS set up the session correctly in the browser.
-  const completeUrl = new URL(`${origin}/auth/complete`);
-  completeUrl.searchParams.set("code", code);
-  completeUrl.searchParams.set("next", next);
-  return NextResponse.redirect(completeUrl.toString());
+  // Set httpOnly cookie with the recovery access token.
+  // httpOnly = JS cannot read it, only server routes can.
+  // path="/" = /api/auth/* routes can receive it.
+  // maxAge=600 = expires in 10 minutes (matches Supabase token expiry).
+  const response = NextResponse.redirect(`${origin}/reset-password`);
+  response.cookies.set("sb-recovery-token", accessToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 600,
+    path: "/",
+  });
+
+  return response;
 }
