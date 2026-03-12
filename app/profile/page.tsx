@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "../lib/supabaseClient";
+import { supabase, prepareSignOut } from "../lib/supabaseClient";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -14,6 +14,7 @@ export default function ProfilePage() {
   const [email, setEmail] = useState("");
   const [points, setPoints] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     loadAll();
@@ -84,6 +85,8 @@ export default function ProfilePage() {
   }
 
   async function logout() {
+    setLoggingOut(true);
+    prepareSignOut();
     await supabase.auth.signOut();
     router.push("/login");
   }
@@ -382,8 +385,16 @@ export default function ProfilePage() {
           correction.
         </div>
 
-        <button onClick={logout} style={logoutBtn}>
-          Log out
+        <button
+          onClick={logout}
+          disabled={loggingOut}
+          style={{
+            ...logoutBtn,
+            opacity: loggingOut ? 0.7 : 1,
+            cursor: loggingOut ? "wait" : "pointer",
+          }}
+        >
+          {loggingOut ? "Logging out..." : "Log out"}
         </button>
       </div>
     </main>

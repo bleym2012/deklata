@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { supabase } from "../lib/supabaseClient";
+import { supabase, prepareSignOut } from "../lib/supabaseClient";
 
 export default function Header() {
   const router = useRouter();
@@ -64,8 +64,9 @@ export default function Header() {
   }, [pathname]);
 
   async function handleLogout() {
-    await supabase.auth.signOut();
     setMenuOpen(false);
+    prepareSignOut();
+    await supabase.auth.signOut();
     router.push("/");
   }
 

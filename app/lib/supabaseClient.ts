@@ -14,6 +14,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 
 // Silently redirect to login on session expiry
 // instead of throwing an unhandled error that crashes the app
+let isSigningOut = false;
 let sessionInitialised = false;
 
 supabase.auth.onAuthStateChange((event) => {
@@ -23,6 +24,10 @@ supabase.auth.onAuthStateChange((event) => {
   }
   if (!sessionInitialised) return;
   if (event === "SIGNED_OUT") {
+    if (isSigningOut) {
+      isSigningOut = false;
+      return;
+    }
     if (
       typeof window !== "undefined" &&
       !window.location.pathname.startsWith("/login") &&
@@ -33,3 +38,7 @@ supabase.auth.onAuthStateChange((event) => {
     }
   }
 });
+
+export function prepareSignOut() {
+  isSigningOut = true;
+}
