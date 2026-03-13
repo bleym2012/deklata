@@ -1,21 +1,8 @@
-// app/reset-password/page.tsx
-//
-// The user arrives here ONLY after /auth/callback has:
-//   1. Verified the PKCE code is genuine
-//   2. Confirmed it is a recovery token (not a regular login)
-//   3. Set a short-lived httpOnly cookie with the recovery access_token
-//
-// This page reads that cookie via a small API route, uses the token to
-// call updateUser(), then clears the cookie and signs the user out so
-// they must log in fresh with their new password.
-//
-// The Supabase JS client on this page operates with the recovery token
-// only — not a full persistent session. The user is never "logged in".
-
 "use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "../lib/supabaseClient";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -23,26 +10,27 @@ export default function ResetPasswordPage() {
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [ready, setReady] = useState(false); // cookie verified
+  const [ready, setReady] = useState(false);
   const [done, setDone] = useState(false);
 
   useEffect(() => {
-    // Verify the recovery cookie exists via our API route.
-    // If it doesn't, the user got here without a valid reset link.
-    fetch("/api/auth/verify-recovery")
-      .then((r) => {
-        if (r.ok) {
-          setReady(true);
-        } else {
-          router.replace("/forgot-password?error=invalid-or-expired");
-        }
-      })
-      .catch(() => router.replace("/forgot-password?error=invalid-or-expired"));
+    // Sign out any existing session first so a logged-in user who clicks
+    // the reset link doesn't stay authenticated during the flow.
+    supabase.auth.signOut().then(() => {
+      fetch("/api/auth/verify-recovery")
+        .then((r) => {
+          if (r.ok) {
+            setReady(true);
+          } else {
+            router.replace("/forgot-password?error=invalid-or-expired");
+          }
+        })
+        .catch(() => router.replace("/forgot-password?error=network-error"));
+    });
   }, [router]);
 
   async function handleUpdate(e: React.FormEvent) {
     e.preventDefault();
-
     if (password.length < 8) {
       setError("Password must be at least 8 characters.");
       return;
@@ -55,14 +43,11 @@ export default function ResetPasswordPage() {
     setLoading(true);
     setError(null);
 
-    // Call our API route which uses the recovery token from the httpOnly
-    // cookie to update the password — the client never touches the token.
     const res = await fetch("/api/auth/update-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ password }),
     });
-
     const data = await res.json();
 
     if (!res.ok) {
@@ -77,8 +62,8 @@ export default function ResetPasswordPage() {
 
   if (!ready && !done) {
     return (
-      <main style={styles.page}>
-        <div style={styles.card}>
+      <main style={pageStyle}>
+        <div style={cardStyle}>
           <div style={{ textAlign: "center", padding: "20px 0" }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>🔐</div>
             <p
@@ -98,8 +83,8 @@ export default function ResetPasswordPage() {
 
   if (done) {
     return (
-      <main style={styles.page}>
-        <div style={styles.card}>
+      <main style={pageStyle}>
+        <div style={cardStyle}>
           <div style={{ textAlign: "center", padding: "20px 0" }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
             <h2
@@ -129,8 +114,8 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <main style={styles.page}>
-      <div style={styles.card}>
+    <main style={pageStyle}>
+      <div style={cardStyle}>
         <h1
           style={{
             fontSize: 22,
@@ -200,22 +185,20 @@ export default function ResetPasswordPage() {
   );
 }
 
-const styles = {
-  page: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 20,
-    background: "var(--background)",
-  } as React.CSSProperties,
-  card: {
-    width: "100%",
-    maxWidth: 380,
-    background: "var(--card-bg)",
-    borderRadius: 18,
-    padding: "28px 24px",
-    boxShadow: "var(--shadow-modal)",
-    border: "1px solid var(--card-border)",
-  } as React.CSSProperties,
+const pageStyle: React.CSSProperties = {
+  minHeight: "100vh",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 20,
+  background: "var(--background)",
+};
+const cardStyle: React.CSSProperties = {
+  width: "100%",
+  maxWidth: 380,
+  background: "var(--card-bg)",
+  borderRadius: 18,
+  padding: "28px 24px",
+  boxShadow: "var(--shadow-modal)",
+  border: "1px solid var(--card-border)",
 };

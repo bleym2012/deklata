@@ -1,5 +1,3 @@
-// app/forgot-password/page.tsx — no changes needed to logic
-// redirectTo must point to /auth/callback which exchanges the PKCE code
 "use client";
 
 import { useState } from "react";
@@ -19,19 +17,15 @@ export default function ForgotPasswordPage() {
     setMessage(null);
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      // PKCE: Supabase will send a link with ?code= to this URL.
-      // /auth/callback exchanges the code server-side and redirects
-      // to /reset-password only after confirming it is a recovery type.
-      redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
+      redirectTo: `${window.location.origin}/auth/callback`,
     });
 
     if (error) {
       setError(error.message);
     } else {
-      setMessage(
-        "Check your inbox — a reset link has been sent. It may take a minute.",
-      );
+      setMessage("If this email exists, a password reset link has been sent.");
     }
+
     setLoading(false);
   }
 
@@ -44,6 +38,7 @@ export default function ForgotPasswordPage() {
         justifyContent: "center",
         padding: 20,
         background: "var(--background)",
+        fontFamily: "var(--font-body)",
       }}
     >
       <div
@@ -75,7 +70,6 @@ export default function ForgotPasswordPage() {
             color: "var(--ink-500)",
             textAlign: "center",
             marginBottom: 22,
-            fontFamily: "var(--font-body)",
           }}
         >
           Enter your email and we'll send you a reset link.
@@ -105,7 +99,7 @@ export default function ForgotPasswordPage() {
               color: "#dc2626",
               marginTop: 14,
               fontSize: 14,
-              fontFamily: "var(--font-body)",
+              textAlign: "center",
             }}
           >
             {error}
@@ -114,25 +108,26 @@ export default function ForgotPasswordPage() {
         {message && (
           <p
             style={{
-              color: "#15803d",
+              color: "var(--green-700)",
               marginTop: 14,
               fontSize: 14,
-              fontFamily: "var(--font-body)",
+              textAlign: "center",
+              fontWeight: 600,
             }}
           >
             {message}
           </p>
         )}
 
-        <p
-          style={{
-            marginTop: 20,
-            fontSize: 14,
-            textAlign: "center",
-            fontFamily: "var(--font-body)",
-          }}
-        >
-          <Link href="/login" style={{ color: "var(--green-800)" }}>
+        <p style={{ marginTop: 20, fontSize: 14, textAlign: "center" }}>
+          <Link
+            href="/login"
+            style={{
+              color: "var(--green-700)",
+              fontWeight: 600,
+              textDecoration: "none",
+            }}
+          >
             Back to login
           </Link>
         </p>
