@@ -13,43 +13,42 @@ export default function ResetPasswordPage() {
   const [ready, setReady] = useState(false);
   const [done, setDone] = useState(false);
 
-  // Ref so the cleanup function can cancel the timeout even after re-render
+  const readyRef = useRef(false); // prevents double setReady
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Prevent double-firing in React Strict Mode
-  const handledRef = useRef(false);
+
+  function markReady() {
+    if (readyRef.current) return; // already handled
+    readyRef.current = true;
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setReady(true);
+  }
 
   useEffect(() => {
-    // Reset on each mount so Strict Mode double-invoke works cleanly
-    handledRef.current = false;
+    // APPROACH: dual detection
+    // 1. Check if session ALREADY exists (SIGNED_IN may have fired before
+    //    this component mounted — common with PKCE code exchange)
+    // 2. Also listen for future events in case exchange hasn't finished yet
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("AUTH EVENT:", event); // remove after confirming fix works
-
-      // Guard: only handle once even if Strict Mode fires twice
-      if (handledRef.current) return;
-
-      if (event === "SIGNED_IN" && session) {
-        handledRef.current = true;
-        // Cancel the timeout — we have a valid session
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        setReady(true);
-        return;
-      }
-
-      if (event === "PASSWORD_RECOVERY") {
-        handledRef.current = true;
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        setReady(true);
-        return;
+    // Check 1: session may already be set by the time we mount
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) {
+        markReady();
       }
     });
 
-    // If no event fires in 10 seconds the user navigated here directly
+    // Check 2: listen for the event if exchange hasn't finished yet
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if ((event === "SIGNED_IN" || event === "PASSWORD_RECOVERY") && session) {
+        markReady();
+      }
+    });
+
+    // Safety net: 12 seconds — user navigated here directly without a reset link
     timeoutRef.current = setTimeout(() => {
       router.replace("/forgot-password");
-    }, 10000);
+    }, 12000);
 
     return () => {
       subscription.unsubscribe();
