@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabaseClient";
 
@@ -13,58 +13,47 @@ export default function ResetPasswordPage() {
   const [ready, setReady] = useState(false);
   const [done, setDone] = useState(false);
 
+  // Ref so the cleanup function can cancel the timeout even after re-render
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Prevent double-firing in React Strict Mode
+  const handledRef = useRef(false);
+
   useEffect(() => {
-    // With PKCE flow, Supabase exchanges the code and fires either:
-    //   PASSWORD_RECOVERY → ideal, show form directly
-    //   SIGNED_IN         → also valid for reset links with PKCE,
-    //                        check amr claim to confirm it's a recovery session
+    // Reset on each mount so Strict Mode double-invoke works cleanly
+    handledRef.current = false;
+
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("AUTH EVENT:", event, session);
-      if (event === "PASSWORD_RECOVERY") {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("AUTH EVENT:", event); // remove after confirming fix works
+
+      // Guard: only handle once even if Strict Mode fires twice
+      if (handledRef.current) return;
+
+      if (event === "SIGNED_IN" && session) {
+        handledRef.current = true;
+        // Cancel the timeout — we have a valid session
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
         setReady(true);
         return;
       }
 
-      if (event === "SIGNED_IN" && session) {
-        // Verify this is a recovery session by checking the AMR claim.
-        // amr (Authentication Methods Reference) contains {method:"otp"}
-        // when the session came from a password reset link.
-        try {
-          const {
-            data: { user },
-          } = await supabase.auth.getUser();
-          const amr =
-            (user as any)?.amr ?? session.user?.app_metadata?.amr ?? [];
-          const isRecovery = Array.isArray(amr)
-            ? amr.some((a: any) => a.method === "otp")
-            : false;
-
-          if (isRecovery) {
-            setReady(true);
-          } else {
-            // Genuine login, not a reset — sign out and redirect
-            await supabase.auth.signOut();
-            router.replace("/login");
-          }
-        } catch {
-          // Can't verify — sign out to be safe
-          await supabase.auth.signOut();
-          router.replace("/forgot-password");
-        }
+      if (event === "PASSWORD_RECOVERY") {
+        handledRef.current = true;
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        setReady(true);
         return;
       }
     });
 
-    // Safety net: no event in 8 seconds = navigated here directly
-    const timeout = setTimeout(() => {
+    // If no event fires in 10 seconds the user navigated here directly
+    timeoutRef.current = setTimeout(() => {
       router.replace("/forgot-password");
-    }, 8000);
+    }, 10000);
 
     return () => {
       subscription.unsubscribe();
-      clearTimeout(timeout);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, [router]);
 
