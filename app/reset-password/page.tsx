@@ -14,19 +14,34 @@ export default function ResetPasswordPage() {
   const [done, setDone] = useState(false);
 
   useEffect(() => {
-    // Sign out any existing session first so a logged-in user who clicks
-    // the reset link doesn't stay authenticated during the flow.
-    supabase.auth.signOut().then(() => {
-      fetch("/api/auth/verify-recovery")
-        .then((r) => {
-          if (r.ok) {
-            setReady(true);
-          } else {
-            router.replace("/forgot-password?error=invalid-or-expired");
-          }
-        })
-        .catch(() => router.replace("/forgot-password?error=network-error"));
+    // Supabase fires PASSWORD_RECOVERY when the user arrived via a reset link.
+    // It fires SIGNED_IN for everything else.
+    // We ONLY show the form on PASSWORD_RECOVERY — reject everything else.
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        // Correct flow — show the form
+        setReady(true);
+      } else if (event === "SIGNED_IN") {
+        // User is being auto-logged in, NOT doing a password reset.
+        // Sign them out immediately and send back to forgot-password.
+        supabase.auth.signOut().then(() => {
+          router.replace("/forgot-password?error=invalid-or-expired");
+        });
+      }
     });
+
+    // Safety net: if no event fires within 4 seconds,
+    // the user navigated here directly without a reset link.
+    const timeout = setTimeout(() => {
+      router.replace("/forgot-password?error=invalid-or-expired");
+    }, 4000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, [router]);
 
   async function handleUpdate(e: React.FormEvent) {
@@ -43,19 +58,16 @@ export default function ResetPasswordPage() {
     setLoading(true);
     setError(null);
 
-    const res = await fetch("/api/auth/update-password", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password }),
-    });
-    const data = await res.json();
+    const { error } = await supabase.auth.updateUser({ password });
 
-    if (!res.ok) {
-      setError(data.error || "Failed to update password. Please try again.");
+    if (error) {
+      setError(error.message);
       setLoading(false);
       return;
     }
 
+    // Sign out after successful update so user must log in fresh
+    await supabase.auth.signOut();
     setDone(true);
     setTimeout(() => router.replace("/login"), 2500);
   }
