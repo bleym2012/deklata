@@ -14,29 +14,29 @@ export default function ResetPasswordPage() {
   const [done, setDone] = useState(false);
 
   useEffect(() => {
-    // Supabase fires PASSWORD_RECOVERY when the user arrived via a reset link.
-    // It fires SIGNED_IN for everything else.
-    // We ONLY show the form on PASSWORD_RECOVERY — reject everything else.
+    // Supabase sends the reset link to /reset-password with the token in the URL.
+    // The JS client picks it up via detectSessionInUrl and fires one of:
+    //   PASSWORD_RECOVERY → user clicked a reset link → show the form ✅
+    //   SIGNED_IN         → something else → reject, don't show form ✅
+    //   INITIAL_SESSION   → no token in URL, user navigated here directly → reject ✅
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY") {
-        // Correct flow — show the form
         setReady(true);
       } else if (event === "SIGNED_IN") {
-        // User is being auto-logged in, NOT doing a password reset.
-        // Sign them out immediately and send back to forgot-password.
-        supabase.auth.signOut().then(() => {
-          router.replace("/forgot-password?error=invalid-or-expired");
-        });
+        // Recovery token auto-logged them in but we don't want that.
+        // Sign out silently — the SIGNED_OUT listener won't redirect
+        // because /reset-password is in the pathname guard.
+        supabase.auth.signOut();
       }
     });
 
-    // Safety net: if no event fires within 4 seconds,
-    // the user navigated here directly without a reset link.
+    // If no PASSWORD_RECOVERY fires within 5 seconds the user
+    // navigated here directly — send them to forgot-password.
     const timeout = setTimeout(() => {
-      router.replace("/forgot-password?error=invalid-or-expired");
-    }, 4000);
+      router.replace("/forgot-password");
+    }, 5000);
 
     return () => {
       subscription.unsubscribe();
@@ -58,6 +58,8 @@ export default function ResetPasswordPage() {
     setLoading(true);
     setError(null);
 
+    // supabase.auth.updateUser uses the active PASSWORD_RECOVERY session.
+    // This is the official Supabase way to update password from a reset link.
     const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
@@ -66,7 +68,7 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    // Sign out after successful update so user must log in fresh
+    // Sign out after update so user logs in fresh with new password.
     await supabase.auth.signOut();
     setDone(true);
     setTimeout(() => router.replace("/login"), 2500);
