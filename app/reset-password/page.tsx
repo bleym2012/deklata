@@ -14,29 +14,52 @@ export default function ResetPasswordPage() {
   const [done, setDone] = useState(false);
 
   useEffect(() => {
-    // Supabase sends the reset link to /reset-password with the token in the URL.
-    // The JS client picks it up via detectSessionInUrl and fires one of:
-    //   PASSWORD_RECOVERY → user clicked a reset link → show the form ✅
-    //   SIGNED_IN         → something else → reject, don't show form ✅
-    //   INITIAL_SESSION   → no token in URL, user navigated here directly → reject ✅
+    // With PKCE flow, Supabase exchanges the code and fires either:
+    //   PASSWORD_RECOVERY → ideal, show form directly
+    //   SIGNED_IN         → also valid for reset links with PKCE,
+    //                        check amr claim to confirm it's a recovery session
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === "PASSWORD_RECOVERY") {
         setReady(true);
-      } else if (event === "SIGNED_IN") {
-        // Recovery token auto-logged them in but we don't want that.
-        // Sign out silently — the SIGNED_OUT listener won't redirect
-        // because /reset-password is in the pathname guard.
-        supabase.auth.signOut();
+        return;
+      }
+
+      if (event === "SIGNED_IN" && session) {
+        // Verify this is a recovery session by checking the AMR claim.
+        // amr (Authentication Methods Reference) contains {method:"otp"}
+        // when the session came from a password reset link.
+        try {
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+          const amr =
+            (user as any)?.amr ?? session.user?.app_metadata?.amr ?? [];
+          const isRecovery = Array.isArray(amr)
+            ? amr.some((a: any) => a.method === "otp")
+            : false;
+
+          if (isRecovery) {
+            setReady(true);
+          } else {
+            // Genuine login, not a reset — sign out and redirect
+            await supabase.auth.signOut();
+            router.replace("/login");
+          }
+        } catch {
+          // Can't verify — sign out to be safe
+          await supabase.auth.signOut();
+          router.replace("/forgot-password");
+        }
+        return;
       }
     });
 
-    // If no PASSWORD_RECOVERY fires within 5 seconds the user
-    // navigated here directly — send them to forgot-password.
+    // Safety net: no event in 8 seconds = navigated here directly
     const timeout = setTimeout(() => {
       router.replace("/forgot-password");
-    }, 5000);
+    }, 8000);
 
     return () => {
       subscription.unsubscribe();
@@ -58,8 +81,6 @@ export default function ResetPasswordPage() {
     setLoading(true);
     setError(null);
 
-    // supabase.auth.updateUser uses the active PASSWORD_RECOVERY session.
-    // This is the official Supabase way to update password from a reset link.
     const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
@@ -68,7 +89,6 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    // Sign out after update so user logs in fresh with new password.
     await supabase.auth.signOut();
     setDone(true);
     setTimeout(() => router.replace("/login"), 2500);
