@@ -14,6 +14,7 @@ export default function ResetPasswordPage() {
   const [done, setDone] = useState(false);
   const readyRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
 
   function markReady() {
     if (readyRef.current) return;
@@ -23,32 +24,31 @@ export default function ResetPasswordPage() {
   }
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token_hash = params.get("token_hash");
-    const type = params.get("type");
+    // Step 1: register listener FIRST before checking session
+    // so we never miss the event regardless of timing
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if ((event === "SIGNED_IN" || event === "PASSWORD_RECOVERY") && session) {
+        markReady();
+      }
+    });
+    subscriptionRef.current = subscription;
 
-    // The email link sends:
-    // /reset-password?token_hash=pkce_xxx&type=recovery
-    // pkce_ prefix = PKCE code → must use exchangeCodeForSession
-    if (token_hash && type === "recovery") {
-      supabase.auth
-        .exchangeCodeForSession(token_hash)
-        .then(({ data, error }) => {
-          if (error || !data.session) {
-            router.replace("/forgot-password?error=expired");
-          } else {
-            markReady();
-          }
-        });
-      return; // don't register listener — exchangeCodeForSession handles everything
-    }
+    // Step 2: check if PKCE exchange already completed before we mounted
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) {
+        markReady();
+      }
+    });
 
-    // Fallback: no token_hash in URL — user navigated here directly
+    // Step 3: safety net — user navigated here directly without a reset link
     timeoutRef.current = setTimeout(() => {
       router.replace("/forgot-password");
     }, 10000);
 
     return () => {
+      subscriptionRef.current?.unsubscribe();
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, [router]);
@@ -75,9 +75,8 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    // Show success instantly — sign out in background
     setDone(true);
-    supabase.auth.signOut();
+    supabase.auth.signOut(); // fire and forget
     setTimeout(() => router.replace("/login"), 2000);
   }
 
