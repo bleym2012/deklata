@@ -23,34 +23,24 @@ export default function ResetPasswordPage() {
   }
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token_hash = params.get("token_hash");
-    const type = params.get("type");
+    // Implicit flow: Supabase appends #access_token=xxx&type=recovery to the URL.
+    // The client reads the hash automatically and fires PASSWORD_RECOVERY.
+    // No manual exchange needed — just listen for the event.
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY" && session) {
+        markReady();
+      }
+    });
 
-    if (token_hash && type === "recovery") {
-      // token_hash=pkce_xxx means PKCE code verifier.
-      // The ONLY correct method to exchange it is exchangeCodeForSession().
-      // onAuthStateChange and getSession() will NEVER fire without this call.
-      supabase.auth
-        .exchangeCodeForSession(token_hash)
-        .then(({ data, error }) => {
-          if (error || !data.session) {
-            // Code expired or already used — send back to request a new link
-            router.replace("/forgot-password?error=expired");
-          } else {
-            // Exchange successful — session is now active, show the form
-            markReady();
-          }
-        });
-      return;
-    }
-
-    // No token in URL — user navigated here directly
+    // Safety net: user navigated here directly without a reset link
     timeoutRef.current = setTimeout(() => {
       router.replace("/forgot-password");
-    }, 3000);
+    }, 10000);
 
     return () => {
+      subscription.unsubscribe();
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, [router]);
