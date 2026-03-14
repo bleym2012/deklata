@@ -12,31 +12,40 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [done, setDone] = useState(false);
-
-  const readyRef = useRef(false); // prevents double setReady
+  const readyRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function markReady() {
-    if (readyRef.current) return; // already handled
+    if (readyRef.current) return;
     readyRef.current = true;
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     setReady(true);
   }
 
   useEffect(() => {
-    // APPROACH: dual detection
-    // 1. Check if session ALREADY exists (SIGNED_IN may have fired before
-    //    this component mounted — common with PKCE code exchange)
-    // 2. Also listen for future events in case exchange hasn't finished yet
+    // The email template sends the user here with ?token_hash=xxx&type=recovery
+    // We exchange it server-side using the Supabase JS client's verifyOtp method.
+    // This is the correct way to handle token_hash links in Supabase JS v2.
+    const params = new URLSearchParams(window.location.search);
+    const token_hash = params.get("token_hash");
+    const type = params.get("type");
 
-    // Check 1: session may already be set by the time we mount
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
-        markReady();
-      }
-    });
+    if (token_hash && type === "recovery") {
+      // Exchange the token_hash for a session — no redirectTo, no allowlist check
+      supabase.auth
+        .verifyOtp({ token_hash, type: "recovery" })
+        .then(({ error }) => {
+          if (error) {
+            router.replace("/forgot-password?error=expired");
+          } else {
+            markReady();
+          }
+        });
+      return;
+    }
 
-    // Check 2: listen for the event if exchange hasn't finished yet
+    // No token_hash in URL — user navigated here directly
+    // Give onAuthStateChange a chance to fire for edge cases
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
@@ -45,10 +54,14 @@ export default function ResetPasswordPage() {
       }
     });
 
-    // Safety net: 12 seconds — user navigated here directly without a reset link
+    // Also check existing session
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) markReady();
+    });
+
     timeoutRef.current = setTimeout(() => {
       router.replace("/forgot-password");
-    }, 12000);
+    }, 10000);
 
     return () => {
       subscription.unsubscribe();
