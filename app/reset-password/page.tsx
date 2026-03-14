@@ -23,15 +23,11 @@ export default function ResetPasswordPage() {
   }
 
   useEffect(() => {
-    // The email template sends the user here with ?token_hash=xxx&type=recovery
-    // We exchange it server-side using the Supabase JS client's verifyOtp method.
-    // This is the correct way to handle token_hash links in Supabase JS v2.
     const params = new URLSearchParams(window.location.search);
     const token_hash = params.get("token_hash");
     const type = params.get("type");
 
     if (token_hash && type === "recovery") {
-      // Exchange the token_hash for a session — no redirectTo, no allowlist check
       supabase.auth
         .verifyOtp({ token_hash, type: "recovery" })
         .then(({ error }) => {
@@ -44,8 +40,6 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    // No token_hash in URL — user navigated here directly
-    // Give onAuthStateChange a chance to fire for edge cases
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
@@ -54,7 +48,6 @@ export default function ResetPasswordPage() {
       }
     });
 
-    // Also check existing session
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) markReady();
     });
@@ -91,9 +84,11 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    await supabase.auth.signOut();
+    // Show success immediately — don't await signOut, run it in background.
+    // This makes the UI feel instant instead of hanging for a second network call.
     setDone(true);
-    setTimeout(() => router.replace("/login"), 2500);
+    supabase.auth.signOut(); // fire and forget
+    setTimeout(() => router.replace("/login"), 2000);
   }
 
   if (!ready && !done) {
@@ -122,7 +117,7 @@ export default function ResetPasswordPage() {
       <main style={pageStyle}>
         <div style={cardStyle}>
           <div style={{ textAlign: "center", padding: "20px 0" }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
+            <div style={{ fontSize: 40, marginBottom: 16 }}>✅</div>
             <h2
               style={{
                 fontSize: 20,
@@ -143,6 +138,31 @@ export default function ResetPasswordPage() {
             >
               Redirecting you to login…
             </p>
+            {/* Progress bar so user sees something happening */}
+            <div
+              style={{
+                marginTop: 20,
+                height: 4,
+                background: "var(--ink-100)",
+                borderRadius: 999,
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  height: "100%",
+                  background: "var(--green-700)",
+                  borderRadius: 999,
+                  animation: "progressBar 2s linear forwards",
+                }}
+              />
+            </div>
+            <style>{`
+              @keyframes progressBar {
+                from { width: 0% }
+                to   { width: 100% }
+              }
+            `}</style>
           </div>
         </div>
       </main>
@@ -197,11 +217,45 @@ export default function ResetPasswordPage() {
           <button
             disabled={loading}
             className="btn-primary"
-            style={{ marginTop: 4, opacity: loading ? 0.7 : 1 }}
+            style={{
+              marginTop: 4,
+              opacity: loading ? 0.7 : 1,
+              transition: "opacity 0.2s",
+            }}
           >
-            {loading ? "Updating…" : "Update password"}
+            {loading ? (
+              <span
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                }}
+              >
+                <span
+                  style={{
+                    width: 14,
+                    height: 14,
+                    border: "2px solid rgba(255,255,255,0.4)",
+                    borderTopColor: "#fff",
+                    borderRadius: "50%",
+                    animation: "spin 0.7s linear infinite",
+                    display: "inline-block",
+                  }}
+                />
+                Updating…
+              </span>
+            ) : (
+              "Update password"
+            )}
           </button>
         </form>
+
+        <style>{`
+          @keyframes spin {
+            to { transform: rotate(360deg) }
+          }
+        `}</style>
 
         {error && (
           <p
