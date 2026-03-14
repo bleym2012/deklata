@@ -17,7 +17,9 @@ export default function ForgotPasswordPage() {
 
     // No redirectTo — the email template hardcodes the correct URL.
     // This bypasses Supabase allowlist validation entirely.
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
 
     if (error) {
       setError(error.message);
