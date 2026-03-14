@@ -27,38 +27,28 @@ export default function ResetPasswordPage() {
     const token_hash = params.get("token_hash");
     const type = params.get("type");
 
+    // The email link sends:
+    // /reset-password?token_hash=pkce_xxx&type=recovery
+    // pkce_ prefix = PKCE code → must use exchangeCodeForSession
     if (token_hash && type === "recovery") {
       supabase.auth
-        .verifyOtp({ token_hash, type: "recovery" })
-        .then(({ error }) => {
-          if (error) {
-            console.log("VERIFY ERROR:", error.message, error.status);
+        .exchangeCodeForSession(token_hash)
+        .then(({ data, error }) => {
+          if (error || !data.session) {
             router.replace("/forgot-password?error=expired");
           } else {
             markReady();
           }
         });
-      return;
+      return; // don't register listener — exchangeCodeForSession handles everything
     }
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if ((event === "SIGNED_IN" || event === "PASSWORD_RECOVERY") && session) {
-        markReady();
-      }
-    });
-
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) markReady();
-    });
-
+    // Fallback: no token_hash in URL — user navigated here directly
     timeoutRef.current = setTimeout(() => {
       router.replace("/forgot-password");
     }, 10000);
 
     return () => {
-      subscription.unsubscribe();
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, [router]);
@@ -85,10 +75,9 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    // Show success immediately — don't await signOut, run it in background.
-    // This makes the UI feel instant instead of hanging for a second network call.
+    // Show success instantly — sign out in background
     setDone(true);
-    supabase.auth.signOut(); // fire and forget
+    supabase.auth.signOut();
     setTimeout(() => router.replace("/login"), 2000);
   }
 
@@ -139,7 +128,6 @@ export default function ResetPasswordPage() {
             >
               Redirecting you to login…
             </p>
-            {/* Progress bar so user sees something happening */}
             <div
               style={{
                 marginTop: 20,
@@ -158,12 +146,7 @@ export default function ResetPasswordPage() {
                 }}
               />
             </div>
-            <style>{`
-              @keyframes progressBar {
-                from { width: 0% }
-                to   { width: 100% }
-              }
-            `}</style>
+            <style>{`@keyframes progressBar { from { width: 0% } to { width: 100% } }`}</style>
           </div>
         </div>
       </main>
@@ -252,11 +235,7 @@ export default function ResetPasswordPage() {
           </button>
         </form>
 
-        <style>{`
-          @keyframes spin {
-            to { transform: rotate(360deg) }
-          }
-        `}</style>
+        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
 
         {error && (
           <p
