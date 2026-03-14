@@ -32,6 +32,7 @@ export default function ResetPasswordPage() {
         .verifyOtp({ token_hash, type: "recovery" })
         .then(({ error }) => {
           if (error) {
+            console.log("VERIFY ERROR:", error.message, error.status);
             router.replace("/forgot-password?error=expired");
           } else {
             markReady();
