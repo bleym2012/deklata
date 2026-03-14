@@ -14,7 +14,6 @@ export default function ResetPasswordPage() {
   const [done, setDone] = useState(false);
   const readyRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
 
   function markReady() {
     if (readyRef.current) return;
@@ -24,31 +23,34 @@ export default function ResetPasswordPage() {
   }
 
   useEffect(() => {
-    // Step 1: register listener FIRST before checking session
-    // so we never miss the event regardless of timing
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if ((event === "SIGNED_IN" || event === "PASSWORD_RECOVERY") && session) {
-        markReady();
-      }
-    });
-    subscriptionRef.current = subscription;
+    const params = new URLSearchParams(window.location.search);
+    const token_hash = params.get("token_hash");
+    const type = params.get("type");
 
-    // Step 2: check if PKCE exchange already completed before we mounted
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
-        markReady();
-      }
-    });
+    if (token_hash && type === "recovery") {
+      // token_hash=pkce_xxx means PKCE code verifier.
+      // The ONLY correct method to exchange it is exchangeCodeForSession().
+      // onAuthStateChange and getSession() will NEVER fire without this call.
+      supabase.auth
+        .exchangeCodeForSession(token_hash)
+        .then(({ data, error }) => {
+          if (error || !data.session) {
+            // Code expired or already used — send back to request a new link
+            router.replace("/forgot-password?error=expired");
+          } else {
+            // Exchange successful — session is now active, show the form
+            markReady();
+          }
+        });
+      return;
+    }
 
-    // Step 3: safety net — user navigated here directly without a reset link
+    // No token in URL — user navigated here directly
     timeoutRef.current = setTimeout(() => {
       router.replace("/forgot-password");
-    }, 10000);
+    }, 3000);
 
     return () => {
-      subscriptionRef.current?.unsubscribe();
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, [router]);
