@@ -21,19 +21,19 @@ export default function ProfilePage() {
   }, []);
 
   async function loadAll() {
-    // ── 1. Single auth call ───────────────────────────────────────────────
+    // getSession() reads localStorage — instant, no network call
     const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-    if (authError || !user) {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session?.user) {
       router.push("/login");
       return;
     }
 
+    const user = session.user;
     setEmail(user.email ?? "");
 
-    // ── 2. Profile + points IN PARALLEL — saves ~600-800ms ───────────────
+    // Profile + points in parallel
     const [profileResult, pointsResult] = await Promise.all([
       supabase
         .from("profiles")
@@ -47,18 +47,13 @@ export default function ProfilePage() {
         .maybeSingle(),
     ]);
 
-    // Points
-    if (pointsResult.error) {
+    if (pointsResult.error)
       console.error("Points fetch error:", pointsResult.error);
-    } else {
-      setPoints(pointsResult.data?.total_points ?? 0);
-    }
+    else setPoints(pointsResult.data?.total_points ?? 0);
 
-    // Profile
     const profileData = profileResult.data;
-    if (profileResult.error) {
+    if (profileResult.error)
       console.error("Profile fetch error:", profileResult.error);
-    }
 
     if (profileData && (!profileData.name || !profileData.campus)) {
       const updates: any = {};
@@ -67,7 +62,6 @@ export default function ProfilePage() {
         router.push("/onboarding");
         return;
       }
-
       await supabase.from("profiles").update(updates).eq("id", user.id);
       setProfile({ ...profileData, ...updates });
     } else {
@@ -91,7 +85,6 @@ export default function ProfilePage() {
     router.push("/login");
   }
 
-  // ── Skeleton ──────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <main style={{ maxWidth: 680, margin: "0 auto", padding: "24px 20px" }}>
@@ -177,7 +170,6 @@ export default function ProfilePage() {
           boxSizing: "border-box",
         }}
       >
-        {/* HEADER — avatar + name */}
         <div
           style={{
             display: "flex",
@@ -186,7 +178,6 @@ export default function ProfilePage() {
             alignItems: "flex-start",
           }}
         >
-          {/* Avatar */}
           <div
             style={{
               width: 72,
@@ -204,8 +195,6 @@ export default function ProfilePage() {
           >
             {profile?.name?.charAt(0)?.toUpperCase() || "U"}
           </div>
-
-          {/* Name + campus — minWidth:0 is critical so flex child can shrink */}
           <div style={{ minWidth: 0, flex: 1 }}>
             <h1
               style={{
@@ -234,7 +223,6 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* POINTS BADGE */}
         <div
           style={{
             display: "inline-flex",
@@ -261,7 +249,6 @@ export default function ProfilePage() {
           {getTier(points)}
         </p>
 
-        {/* POINTS PROGRESS BAR */}
         {(() => {
           const tiers = [
             { label: "Bronze Giver 🥉", min: 0, max: 50 },
@@ -342,7 +329,6 @@ export default function ProfilePage() {
           Points are earned by successfully giving items to others.
         </p>
 
-        {/* INFO BOX */}
         <div
           style={{
             background: "var(--green-50)",
@@ -368,7 +354,6 @@ export default function ProfilePage() {
           </p>
         </div>
 
-        {/* GOVERNANCE NOTE */}
         <div
           style={{
             background: "#fef3c7",

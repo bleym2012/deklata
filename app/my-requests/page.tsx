@@ -10,47 +10,32 @@ export default function MyRequestsPage() {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [authChecking, setAuthChecking] = useState(true);
   const [ownerProfiles, setOwnerProfiles] = useState<Record<string, any>>({});
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    checkAuth();
+    // getSession() = instant localStorage read, no network call
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session?.user) {
+        router.push("/login");
+        return;
+      }
+      setUserId(session.user.id);
+      loadMyRequests(session.user.id);
+    });
   }, []);
 
-  async function checkAuth() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      router.push("/login");
-      return;
-    }
-    setAuthChecking(false);
-    loadMyRequests();
-  }
-
-  async function loadMyRequests() {
+  async function loadMyRequests(uid: string) {
     setLoading(true);
     setError("");
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      router.push("/login");
-      return;
-    }
 
-    // Fire requests query immediately — don't wait for auth round trip separately
     const { data, error } = await supabase
       .from("requests")
       .select(
-        `
-        id, status, requester_visible, requester_confirmed, created_at,
-        items ( id, name, owner_id )
-      `,
+        `id, status, requester_visible, requester_confirmed, created_at, items ( id, name, owner_id )`,
       )
-      .eq("requester_id", user.id)
+      .eq("requester_id", uid)
       .in("status", ["pending", "approved"])
       .order("created_at", { ascending: false });
 
@@ -63,7 +48,6 @@ export default function MyRequestsPage() {
     const safe = (data || []).filter((r) => r.items !== null);
     setRequests(safe);
 
-    // Only fetch owner contact for approved+visible requests
     const ownerIds = Array.from(
       new Set(
         safe
@@ -99,14 +83,12 @@ export default function MyRequestsPage() {
       setCancellingId(null);
       return;
     }
-    // Unlock item if it was locked for this request
-    // Unlock item and restore available status
     await supabase
       .from("items")
       .update({ is_locked: false, status: "available" })
       .eq("id", itemId);
     setCancellingId(null);
-    loadMyRequests();
+    if (userId) loadMyRequests(userId);
   }
 
   async function confirmReceived(requestId: string) {
@@ -117,31 +99,9 @@ export default function MyRequestsPage() {
       alert(error.message);
       return;
     }
-    loadMyRequests();
+    if (userId) loadMyRequests(userId);
   }
 
-  if (authChecking)
-    return (
-      <main style={{ maxWidth: 860, margin: "0 auto", padding: "24px 16px" }}>
-        <div
-          className="skeleton"
-          style={{ height: 32, width: "35%", marginBottom: 16 }}
-        />
-        <div
-          className="skeleton"
-          style={{ height: 20, width: "55%", marginBottom: 28 }}
-        />
-        <div style={{ display: "grid", gap: 16 }}>
-          {[...Array(3)].map((_, i) => (
-            <div
-              key={i}
-              className="skeleton"
-              style={{ height: 140, borderRadius: 16 }}
-            />
-          ))}
-        </div>
-      </main>
-    );
   const pendingRequests = requests.filter((r) => r.status === "pending");
   const approvedRequests = requests.filter((r) => r.status === "approved");
 
@@ -228,7 +188,6 @@ export default function MyRequestsPage() {
         </div>
       ) : (
         <div style={{ display: "grid", gap: 16 }}>
-          {/* ── PENDING ── */}
           {pendingRequests.length > 0 && (
             <>
               <p
@@ -293,8 +252,7 @@ export default function MyRequestsPage() {
                       marginBottom: 14,
                     }}
                   >
-                    ⏳ Waiting for the owner to review your request. You'll be
-                    notified when approved.
+                    ⏳ Waiting for the owner to review your request.
                   </p>
                   <button
                     onClick={() => cancelRequest(req.id, req.items.id)}
@@ -319,7 +277,6 @@ export default function MyRequestsPage() {
             </>
           )}
 
-          {/* ── APPROVED ── */}
           {approvedRequests.length > 0 && (
             <>
               <p
@@ -379,7 +336,6 @@ export default function MyRequestsPage() {
                         APPROVED
                       </span>
                     </div>
-
                     {req.requester_visible && owner ? (
                       <div
                         style={{
@@ -449,7 +405,6 @@ export default function MyRequestsPage() {
                         Loading contact details…
                       </p>
                     )}
-
                     {!req.requester_confirmed ? (
                       <button
                         onClick={() => confirmReceived(req.id)}

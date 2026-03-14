@@ -16,17 +16,22 @@ export default function OwnerDashboard() {
   const [error, setError] = useState("");
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
-  const [authChecking, setAuthChecking] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    checkAuth();
+    // getSession() = instant localStorage read, no network call
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session?.user) {
+        router.push("/login");
+        return;
+      }
+      setUserId(session.user.id);
+      loadRequests(session.user.id);
+    });
   }, []);
 
   useEffect(() => {
     if (!userId) return;
-
-    // Realtime: re-fetch when any request row changes (requester confirms, etc.)
     const channel = supabase
       .channel("dashboard-requests")
       .on(
@@ -37,27 +42,14 @@ export default function OwnerDashboard() {
         },
       )
       .subscribe();
-
     return () => {
       supabase.removeChannel(channel);
     };
   }, [userId]);
+
   useEffect(() => {
     if (userId && tab === "myitems") loadMyItems();
   }, [tab, userId]);
-
-  async function checkAuth() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      router.push("/login");
-      return;
-    }
-    setUserId(user.id);
-    setAuthChecking(false);
-    loadRequests(user.id);
-  }
 
   async function loadMyItems() {
     setItemsLoading(true);
@@ -80,7 +72,6 @@ export default function OwnerDashboard() {
       return;
     }
     if (!confirm("Delete this item permanently?")) return;
-    // Reject any pending requests first
     await supabase
       .from("requests")
       .update({ status: "rejected" })
@@ -114,11 +105,7 @@ export default function OwnerDashboard() {
     const { data, error } = await supabase
       .from("requests")
       .select(
-        `
-        id, status, requester_id, owner_visible, owner_confirmed,
-        requester_confirmed, item_id, created_at,
-        items ( id, name, owner_id, is_locked, is_completed )
-      `,
+        `id, status, requester_id, owner_visible, owner_confirmed, requester_confirmed, item_id, created_at, items ( id, name, owner_id, is_locked, is_completed )`,
       )
       .eq("items.owner_id", uid)
       .in("status", ["pending", "approved", "completed"])
@@ -133,7 +120,6 @@ export default function OwnerDashboard() {
     const safe = (data || []).filter((r) => r.items !== null);
     setRequests(safe);
 
-    // Fetch all requester profiles in one parallel query
     const allRequesterIds = [...new Set(safe.map((r) => r.requester_id))];
     if (allRequesterIds.length > 0) {
       const { data: profs } = await supabase
@@ -146,22 +132,21 @@ export default function OwnerDashboard() {
       });
       setProfiles(map);
     }
-
     setLoading(false);
   }
 
   async function approveRequest(requestId: string, itemId: string) {
     try {
       setApprovingId(requestId);
+      // Use cached session — no network call
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) {
         alert("Not authenticated");
         return;
       }
 
-      // Check there is no OTHER approved request for this item already
       const { data: existingApproval } = await supabase
         .from("requests")
         .select("id")
@@ -171,7 +156,7 @@ export default function OwnerDashboard() {
         .maybeSingle();
       if (existingApproval) {
         alert("This item already has an approved request.");
-        await loadRequests(user.id);
+        await loadRequests(session.user.id);
         return;
       }
 
@@ -200,39 +185,25 @@ export default function OwnerDashboard() {
         return;
       }
 
-      // Send approval email notification
       try {
-        const { data: requestData } = await supabase
-          .from("requests")
-          .select("requester_id, item_id")
-          .eq("id", requestId)
-          .single();
-        if (requestData) {
-          const {
-            data: { session },
-          } = await supabase.auth.getSession();
-          if (session?.access_token) {
-            await fetch(
-              "https://iibknadykycghvbjbwxs.supabase.co/functions/v1/notify-owner-request",
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${session.access_token}`,
-                },
-                body: JSON.stringify({
-                  type: "approved",
-                  request_id: requestId,
-                }),
+        if (session.access_token) {
+          await fetch(
+            "https://iibknadykycghvbjbwxs.supabase.co/functions/v1/notify-owner-request",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${session.access_token}`,
               },
-            );
-          }
+              body: JSON.stringify({ type: "approved", request_id: requestId }),
+            },
+          );
         }
       } catch (emailError) {
         console.error("Approval email failed:", emailError);
       }
 
-      loadRequests(user.id);
+      loadRequests(session.user.id);
     } finally {
       setApprovingId(null);
     }
@@ -243,41 +214,17 @@ export default function OwnerDashboard() {
       .from("requests")
       .delete()
       .eq("id", requestId);
-    if (deleteError) {
+    if (deleteError)
       await supabase
         .from("requests")
         .update({ status: "rejected" })
         .eq("id", requestId);
-    }
     await supabase
       .from("items")
       .update({ is_locked: false, status: "available" })
       .eq("id", itemId);
     loadRequests(userId!);
   }
-
-  if (authChecking)
-    return (
-      <main style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px" }}>
-        <div
-          className="skeleton"
-          style={{ height: 32, width: "30%", marginBottom: 16 }}
-        />
-        <div
-          className="skeleton"
-          style={{ height: 20, width: "50%", marginBottom: 28 }}
-        />
-        <div style={{ display: "grid", gap: 16 }}>
-          {[...Array(3)].map((_, i) => (
-            <div
-              key={i}
-              className="skeleton"
-              style={{ height: 140, borderRadius: 16 }}
-            />
-          ))}
-        </div>
-      </main>
-    );
 
   const pendingCount = requests.filter((r) => r.status === "pending").length;
   const approvedCount = requests.filter((r) => r.status === "approved").length;
@@ -363,7 +310,7 @@ export default function OwnerDashboard() {
 
       {error && <p style={{ color: "#dc2626", marginBottom: 16 }}>{error}</p>}
 
-      {/* ── REQUESTS TAB ── */}
+      {/* REQUESTS TAB */}
       {tab === "requests" && (
         <>
           {loading ? (
@@ -422,7 +369,6 @@ export default function OwnerDashboard() {
                 const firstName =
                   requesterProfile?.name?.split(" ")[0] || "A student";
                 const requesterCampus = requesterProfile?.campus || "";
-
                 return (
                   <div
                     key={req.id}
@@ -600,36 +546,24 @@ export default function OwnerDashboard() {
                               }}
                             >
                               {completingId === req.id
-                                ? "Confirming…"
-                                : "✅ Mark item as given"}
+                                ? "Completing…"
+                                : "✓ I gave this item"}
                             </button>
                           ) : (
-                            <p
+                            <div
                               style={{
-                                marginTop: 12,
-                                fontSize: 14,
-                                color: req.requester_confirmed
-                                  ? "var(--green-800)"
-                                  : "var(--ink-500)",
-                                fontWeight: 600,
-                              }}
-                            >
-                              {req.requester_confirmed
-                                ? "🎉 Both confirmed — exchange complete!"
-                                : "✅ You've confirmed giving this item. Waiting for receiver confirmation."}
-                            </p>
-                          )}
-                          {item.is_completed && (
-                            <p
-                              style={{
-                                marginTop: 8,
+                                marginTop: 14,
+                                padding: 12,
+                                background: "#dcfce7",
+                                borderRadius: 10,
+                                color: "#166534",
+                                fontWeight: 700,
+                                textAlign: "center",
                                 fontSize: 13,
-                                color: "var(--green-700)",
-                                fontWeight: 600,
                               }}
                             >
-                              🎉 Exchange complete — points awarded!
-                            </p>
+                              ✔ You confirmed giving this item
+                            </div>
                           )}
                         </div>
                       )}
@@ -641,40 +575,16 @@ export default function OwnerDashboard() {
         </>
       )}
 
-      {/* ── MY ITEMS TAB ── */}
+      {/* MY ITEMS TAB */}
       {tab === "myitems" && (
         <>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              marginBottom: 16,
-            }}
-          >
-            <Link
-              href="/add-item"
-              style={{
-                background: "var(--gold)",
-                color: "#fff",
-                padding: "10px 22px",
-                borderRadius: 999,
-                fontFamily: "var(--font-display)",
-                fontWeight: 700,
-                fontSize: 13,
-                textDecoration: "none",
-              }}
-            >
-              + Add new item
-            </Link>
-          </div>
-
           {itemsLoading ? (
-            <div style={{ display: "grid", gap: 14 }}>
-              {[...Array(4)].map((_, i) => (
+            <div style={{ display: "grid", gap: 16 }}>
+              {[...Array(3)].map((_, i) => (
                 <div
                   key={i}
                   className="skeleton"
-                  style={{ height: 90, borderRadius: 14 }}
+                  style={{ height: 100, borderRadius: 16 }}
                 />
               ))}
             </div>
@@ -696,9 +606,22 @@ export default function OwnerDashboard() {
               >
                 No items posted yet
               </p>
-              <p style={{ fontSize: 14, marginTop: 6 }}>
-                Start giving — post your first item today.
-              </p>
+              <Link
+                href="/add-item"
+                style={{
+                  display: "inline-block",
+                  marginTop: 20,
+                  background: "var(--green-800)",
+                  color: "#fff",
+                  padding: "10px 24px",
+                  borderRadius: 999,
+                  fontFamily: "var(--font-display)",
+                  fontWeight: 700,
+                  fontSize: 14,
+                }}
+              >
+                + Post an item
+              </Link>
             </div>
           ) : (
             <div style={{ display: "grid", gap: 12 }}>
@@ -708,107 +631,72 @@ export default function OwnerDashboard() {
                   style={{
                     background: "var(--white)",
                     borderRadius: 14,
-                    padding: "16px 20px",
+                    padding: "16px 18px",
                     boxShadow: "var(--shadow-card)",
                     border: "1px solid var(--ink-100)",
                     display: "flex",
-
-                    flexDirection: "column",
-                    gap: 10,
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 12,
+                    flexWrap: "wrap",
                   }}
                 >
-                  <div style={{ minWidth: 0, width: "100%" }}>
+                  <div style={{ minWidth: 0 }}>
                     <p
                       style={{
                         fontWeight: 700,
-                        fontFamily: "var(--font-display)",
-                        fontSize: 15,
                         color: "var(--ink-900)",
-                        marginBottom: 4,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
+                        fontFamily: "var(--font-display)",
+                        margin: 0,
+                        fontSize: 15,
                       }}
                     >
                       {item.name}
                     </p>
-                    <div
+                    <p
                       style={{
-                        display: "flex",
-                        gap: 8,
-                        alignItems: "center",
-                        flexWrap: "wrap",
+                        fontSize: 12,
+                        color: "var(--ink-400)",
+                        margin: "4px 0 0",
+                        fontFamily: "var(--font-body)",
                       }}
                     >
-                      <span style={{ fontSize: 12, color: "var(--ink-400)" }}>
-                        {item.categories?.name || "—"}
-                      </span>
+                      {(item.categories as any)?.name || "Uncategorised"} ·{" "}
                       <span
                         style={{
-                          padding: "2px 8px",
-                          borderRadius: 999,
-                          fontSize: 11,
-                          fontWeight: 600,
-                          background: item.is_completed
-                            ? "#dcfce7"
-                            : item.is_locked
-                              ? "#fef3c7"
-                              : "#f0fdf4",
                           color: item.is_completed
-                            ? "#166534"
+                            ? "var(--green-700)"
                             : item.is_locked
-                              ? "#92400e"
-                              : "var(--green-700)",
+                              ? "var(--gold)"
+                              : "var(--green-600)",
+                          fontWeight: 600,
                         }}
                       >
                         {item.is_completed
                           ? "Completed"
                           : item.is_locked
-                            ? "Locked"
+                            ? "Request pending"
                             : "Available"}
                       </span>
-                    </div>
+                    </p>
                   </div>
-                  <div
+                  <button
+                    onClick={() => deleteMyItem(item.id, item.is_locked)}
                     style={{
-                      display: "flex",
-                      gap: 8,
-                      alignItems: "center",
-                      flexWrap: "wrap",
+                      padding: "7px 14px",
+                      borderRadius: 10,
+                      border: "1.5px solid #fecaca",
+                      background: "var(--white)",
+                      color: "#dc2626",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      fontSize: 13,
+                      fontFamily: "var(--font-body)",
+                      flexShrink: 0,
                     }}
                   >
-                    <Link
-                      href={`/item/${item.id}`}
-                      style={{
-                        fontSize: 12,
-                        color: "var(--green-700)",
-                        fontWeight: 600,
-                        textDecoration: "none",
-                        padding: "7px 16px",
-                        border: "1.5px solid var(--green-100)",
-                        borderRadius: 8,
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      View
-                    </Link>
-                    <button
-                      onClick={() => deleteMyItem(item.id, item.is_locked)}
-                      style={{
-                        fontSize: 12,
-                        color: "#dc2626",
-                        fontWeight: 600,
-                        background: "none",
-                        border: "1.5px solid #fecaca",
-                        borderRadius: 8,
-                        padding: "7px 16px",
-                        cursor: "pointer",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </div>
+                    Delete
+                  </button>
                 </div>
               ))}
             </div>
