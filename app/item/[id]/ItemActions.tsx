@@ -74,9 +74,12 @@ export default function ItemActions({ item, images, itemId, backUrl }: Props) {
 
   async function requestItem() {
     const check = await requireVerifiedUser();
+    console.log("AUTH CHECK:", JSON.stringify(check));
     if (!check.ok) {
       if (check.reason === "not_logged_in") {
         router.push(`/login?redirect=/item/${itemId}`);
+      } else if (check.reason === "not_onboarded") {
+        router.push("/onboarding");
       } else {
         alert("Please verify your email before requesting items.");
       }
