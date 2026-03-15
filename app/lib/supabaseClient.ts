@@ -12,8 +12,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
-// Silently redirect to login on session expiry
-// instead of throwing an unhandled error that crashes the app
 let isSigningOut = false;
 let sessionInitialised = false;
 
@@ -23,6 +21,18 @@ supabase.auth.onAuthStateChange((event) => {
     return;
   }
   if (!sessionInitialised) return;
+
+  // SIGNED_IN fires when reset link is clicked — do NOT redirect away.
+  // The reset-password page handles this event itself via its own listener.
+  if (event === "SIGNED_IN") {
+    if (
+      typeof window !== "undefined" &&
+      window.location.pathname.startsWith("/reset-password")
+    ) {
+      return; // let reset-password page handle it
+    }
+  }
+
   if (event === "SIGNED_OUT") {
     if (isSigningOut) {
       isSigningOut = false;

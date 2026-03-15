@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabaseClient";
 
@@ -12,36 +12,30 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [done, setDone] = useState(false);
-  const readyRef = useRef(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  function markReady() {
-    if (readyRef.current) return;
-    readyRef.current = true;
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    setReady(true);
-  }
 
   useEffect(() => {
-    // Implicit flow: Supabase appends #access_token=xxx&type=recovery to the URL.
-    // The client reads the hash automatically and fires PASSWORD_RECOVERY.
-    // No manual exchange needed — just listen for the event.
+    // Supabase auto-logs the user in when reset link is clicked.
+    // It fires SIGNED_IN first, then PASSWORD_RECOVERY.
+    // We listen for PASSWORD_RECOVERY — that is the definitive signal
+    // that the user arrived here via a reset link, not a normal login.
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY" && session) {
-        markReady();
+      if (event === "PASSWORD_RECOVERY") {
+        // Recovery session confirmed — show the form
+        setReady(true);
       }
     });
 
-    // Safety net: user navigated here directly without a reset link
-    timeoutRef.current = setTimeout(() => {
+    // Safety net: if no PASSWORD_RECOVERY fires in 8 seconds,
+    // the user navigated here directly without a reset link
+    const timeout = setTimeout(() => {
       router.replace("/forgot-password");
-    }, 10000);
+    }, 8000);
 
     return () => {
       subscription.unsubscribe();
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      clearTimeout(timeout);
     };
   }, [router]);
 
