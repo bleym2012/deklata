@@ -1,19 +1,17 @@
 import { supabase } from "../lib/supabaseClient";
 
 export async function requireVerifiedUser() {
+  // getSession() reads from localStorage — instant and always returns
+  // the correct session for both Google OAuth and email/password users.
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
 
-  // Not logged in at all
-  if (!user) {
+  if (!session?.user) {
     return { ok: false, reason: "not_logged_in" } as const;
   }
 
-  // If user is logged in, their email is verified.
-  // Email/password users must confirm before Supabase lets them log in.
-  // Google OAuth users are verified by Google.
-  // No need to check email_confirmed_at separately.
+  const user = session.user;
 
   // Check onboarding — must have campus and phone set
   const { data: profile } = await supabase
