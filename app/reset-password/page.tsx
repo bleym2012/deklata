@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabaseClient";
 
@@ -12,30 +12,52 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [done, setDone] = useState(false);
+  const readyRef = useRef(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function markReady() {
+    if (readyRef.current) return;
+    readyRef.current = true;
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setReady(true);
+  }
 
   useEffect(() => {
-    // Supabase auto-logs the user in when reset link is clicked.
-    // It fires SIGNED_IN first, then PASSWORD_RECOVERY.
-    // We listen for PASSWORD_RECOVERY — that is the definitive signal
-    // that the user arrived here via a reset link, not a normal login.
+    // With flowType:"pkce" + detectSessionInUrl:true + reactStrictMode:false:
+    // 1. User clicks reset link → lands on /reset-password?code=xxx
+    // 2. Supabase JS client sees the code, auto-exchanges it (no manual call needed)
+    // 3. Fires PASSWORD_RECOVERY event
+    // 4. Our listener catches it and shows the form
+    // Single mount guaranteed by reactStrictMode:false → no lock conflicts
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY") {
-        // Recovery session confirmed — show the form
-        setReady(true);
+      if (event === "PASSWORD_RECOVERY" && session) {
+        markReady();
       }
     });
 
-    // Safety net: if no PASSWORD_RECOVERY fires in 8 seconds,
-    // the user navigated here directly without a reset link
-    const timeout = setTimeout(() => {
+    // Backup for slow connections where exchange completes before listener fires.
+    // ONLY runs if there's a code in the URL — prevents showing form to
+    // logged-in users who navigate to /reset-password directly.
+    const hasCode =
+      typeof window !== "undefined" && window.location.search.includes("code=");
+
+    if (hasCode) {
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session) markReady();
+      });
+    }
+
+    // Safety net: no event in 12 seconds = no reset link used
+    timeoutRef.current = setTimeout(() => {
       router.replace("/forgot-password");
-    }, 8000);
+    }, 12000);
 
     return () => {
       subscription.unsubscribe();
-      clearTimeout(timeout);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, [router]);
 
@@ -62,7 +84,7 @@ export default function ResetPasswordPage() {
     }
 
     setDone(true);
-    supabase.auth.signOut(); // fire and forget
+    supabase.auth.signOut();
     setTimeout(() => router.replace("/login"), 2000);
   }
 

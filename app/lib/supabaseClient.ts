@@ -8,7 +8,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    flowType: "implicit",
+    flowType: "pkce",
   },
 });
 
@@ -22,14 +22,12 @@ supabase.auth.onAuthStateChange((event) => {
   }
   if (!sessionInitialised) return;
 
-  // SIGNED_IN fires when reset link is clicked — do NOT redirect away.
-  // The reset-password page handles this event itself via its own listener.
-  if (event === "SIGNED_IN") {
+  if (event === "SIGNED_IN" || event === "PASSWORD_RECOVERY") {
     if (
       typeof window !== "undefined" &&
       window.location.pathname.startsWith("/reset-password")
     ) {
-      return; // let reset-password page handle it
+      return;
     }
   }
 
