@@ -9,7 +9,14 @@ export async function requireVerifiedUser() {
     return { ok: false, reason: "not_logged_in" } as const;
   }
 
-  if (!user.email_confirmed_at) {
+  // Google OAuth users are always verified — Supabase confirms their email
+  // automatically but email_confirmed_at may be null in some project configs.
+  // Check provider to skip the email verification requirement for OAuth users.
+  const isOAuthUser =
+    user.app_metadata?.provider === "google" ||
+    (user.identities ?? []).some((i) => i.provider === "google");
+
+  if (!isOAuthUser && !user.email_confirmed_at) {
     return { ok: false, reason: "email_not_verified" } as const;
   }
 
