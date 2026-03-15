@@ -5,22 +5,17 @@ export async function requireVerifiedUser() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Not logged in at all
   if (!user) {
     return { ok: false, reason: "not_logged_in" } as const;
   }
 
-  // Google OAuth users are always verified — Supabase confirms their email
-  // automatically but email_confirmed_at may be null in some project configs.
-  // Check provider to skip the email verification requirement for OAuth users.
-  const isOAuthUser =
-    user.app_metadata?.provider === "google" ||
-    (user.identities ?? []).some((i) => i.provider === "google");
+  // If user is logged in, their email is verified.
+  // Email/password users must confirm before Supabase lets them log in.
+  // Google OAuth users are verified by Google.
+  // No need to check email_confirmed_at separately.
 
-  if (!isOAuthUser && !user.email_confirmed_at) {
-    return { ok: false, reason: "email_not_verified" } as const;
-  }
-
-  // Check onboarding — same logic as add-item page
+  // Check onboarding — must have campus and phone set
   const { data: profile } = await supabase
     .from("profiles")
     .select("campus, phone")
