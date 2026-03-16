@@ -8,7 +8,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    flowType: "pkce",
+    flowType: "implicit",
   },
 });
 
@@ -21,15 +21,6 @@ supabase.auth.onAuthStateChange((event) => {
     return;
   }
   if (!sessionInitialised) return;
-
-  if (event === "SIGNED_IN" || event === "PASSWORD_RECOVERY") {
-    if (
-      typeof window !== "undefined" &&
-      window.location.pathname.startsWith("/reset-password")
-    ) {
-      return;
-    }
-  }
 
   if (event === "SIGNED_OUT") {
     if (isSigningOut) {
