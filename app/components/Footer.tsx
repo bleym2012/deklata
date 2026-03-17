@@ -97,6 +97,10 @@ export default function Footer() {
                   href: "https://tiktok.com/@yourhandle",
                   icon: <TikTokIcon />,
                 },
+                {
+                  href: "https://wa.me/233202162972",
+                  icon: <WhatsAppIcon />,
+                },
               ].map((s, i) => (
                 <a
                   key={i}
@@ -380,6 +384,14 @@ function TikTokIcon() {
   return (
     <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
       <path d="M12 2h3a4 4 0 004 4v3a7 7 0 01-4-1.3V14a6 6 0 11-6-6h1v3h-1a3 3 0 103 3V2z" />
+    </svg>
+  );
+}
+
+function WhatsAppIcon() {
+  return (
+    <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+      <path d="M17.5 14.4c-.3-.1-1.7-.8-1.9-.9-.3-.1-.5-.1-.7.1-.2.3-.8.9-1 1.1-.2.2-.4.2-.7.1-.3-.1-1.3-.5-2.4-1.5-.9-.8-1.5-1.8-1.6-2.1-.2-.3 0-.5.1-.6.1-.1.3-.3.4-.5.1-.2.1-.3.2-.5.1-.2 0-.4 0-.5-.1-.2-.7-1.6-1-2.2-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4C7 9 6.4 9.6 6.4 10.9s.9 2.6 1 2.8c.1.2 1.7 2.6 4.1 3.6.6.2 1 .4 1.4.5.6.2 1.1.2 1.5.1.5-.1 1.7-.7 1.9-1.3.2-.6.2-1.2.1-1.3-.1-.1-.3-.2-.5-.3zM12 2a10 10 0 00-8.6 15L2 22l5.2-1.4A10 10 0 1012 2z" />
     </svg>
   );
 }
