@@ -282,8 +282,8 @@ export default function HomeClient({
                 lineHeight: 1.4,
               }}
             >
-              Free student item exchange across Tamale campuses. 100% free,
-              always.
+              Free item exchange platform for tertiary students across Tamale
+              campuses. 100% free, always.
             </p>
           </div>
           <span

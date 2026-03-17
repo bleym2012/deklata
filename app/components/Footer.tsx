@@ -74,8 +74,8 @@ export default function Footer() {
                 margin: 0,
               }}
             >
-              Connecting Ghanaian students who have extra items with those who
-              need them — safely, simply, and for free.
+              Connecting tertiary students in Tamale who have extra items with
+              those who need them — safely, simply, and for free.
             </p>
 
             {/* SOCIAL */}
