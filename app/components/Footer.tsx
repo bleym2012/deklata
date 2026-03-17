@@ -94,7 +94,7 @@ export default function Footer() {
                   icon: <FacebookIcon />,
                 },
                 {
-                  href: "https://tiktok.com/@yourhandle",
+                  href: "https://tiktok.com/@deklata",
                   icon: <TikTokIcon />,
                 },
                 {
