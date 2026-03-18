@@ -189,27 +189,62 @@ export default function AddItemPage() {
       return;
     }
 
-    // All images upload in parallel — not sequential
+    // FIX 1: Upload all images in parallel, collect URLs, then batch-insert
+    // in a single DB call instead of one insert per image.
+    // FIX 2: Wrap the entire upload block in a 30-second timeout so users
+    // get a clear error instead of waiting forever on a poor connection.
     if (images.length > 0) {
-      await Promise.all(
-        images.map(async (image) => {
-          const ext = image.name.split(".").pop()?.toLowerCase() || "jpg";
-          const filePath = `${item.id}/${crypto.randomUUID()}.${ext}`;
-          const { error: uploadError } = await supabase.storage
-            .from("item-images")
-            .upload(filePath, image, {
-              contentType: image.type,
-              upsert: false,
-            });
-          if (uploadError) return;
-          const publicUrl = supabase.storage
-            .from("item-images")
-            .getPublicUrl(filePath).data.publicUrl;
-          await supabase
-            .from("item_images")
-            .insert({ item_id: item.id, image_url: publicUrl });
-        }),
-      );
+      try {
+        await Promise.race([
+          (async () => {
+            // Step 1 — upload all images to storage in parallel
+            const uploadedUrls = await Promise.all(
+              images.map(async (image) => {
+                const ext = image.name.split(".").pop()?.toLowerCase() || "jpg";
+                const filePath = `${item.id}/${crypto.randomUUID()}.${ext}`;
+                const { error: uploadError } = await supabase.storage
+                  .from("item-images")
+                  .upload(filePath, image, {
+                    contentType: image.type,
+                    upsert: false,
+                  });
+                if (uploadError) return null;
+                return supabase.storage
+                  .from("item-images")
+                  .getPublicUrl(filePath).data.publicUrl;
+              }),
+            );
+
+            // Step 2 — single batch insert for all URLs (1 DB call instead of 3)
+            const validUrls = uploadedUrls.filter(Boolean) as string[];
+            if (validUrls.length > 0) {
+              await supabase
+                .from("item_images")
+                .insert(
+                  validUrls.map((image_url) => ({
+                    item_id: item.id,
+                    image_url,
+                  })),
+                );
+            }
+          })(),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () =>
+                reject(
+                  new Error(
+                    "Upload timed out. Check your connection and try again.",
+                  ),
+                ),
+              30000,
+            ),
+          ),
+        ]);
+      } catch (err: any) {
+        setError(err.message);
+        setSubmitting(false);
+        return;
+      }
     }
 
     router.push("/");
