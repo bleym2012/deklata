@@ -128,10 +128,16 @@ export async function POST(request: NextRequest) {
    API routes without needing additional type declarations. ── */
 
 async function sha256Hex(
-  data: ArrayBuffer | ArrayBufferView | string,
+  data: ArrayBuffer | Uint8Array | string,
 ): Promise<string> {
-  const input: ArrayBuffer | ArrayBufferView =
-    typeof data === "string" ? new TextEncoder().encode(data) : data;
+  let input: Uint8Array;
+  if (typeof data === "string") {
+    input = new TextEncoder().encode(data);
+  } else if (data instanceof Uint8Array) {
+    input = data;
+  } else {
+    input = new Uint8Array(data as ArrayBuffer);
+  }
   const buf = await globalThis.crypto.subtle.digest("SHA-256", input);
   return Array.from(new Uint8Array(buf))
     .map((b) => b.toString(16).padStart(2, "0"))
