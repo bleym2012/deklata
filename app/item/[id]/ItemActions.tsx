@@ -39,6 +39,7 @@ export default function ItemActions({ item, images, itemId, backUrl }: Props) {
 
   // ── UI state ──────────────────────────────────────────────────────────────
   const [requesting, setRequesting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [requestSuccess, setRequestSuccess] = useState(false);
@@ -144,6 +145,7 @@ export default function ItemActions({ item, images, itemId, backUrl }: Props) {
       )
     )
       return;
+    setDeleting(true);
     // First reject/delete all requests so requesters are not left hanging
     await supabase
       .from("requests")
@@ -159,6 +161,7 @@ export default function ItemActions({ item, images, itemId, backUrl }: Props) {
       .eq("owner_id", userId);
     if (error) {
       alert("Could not delete item. You may not have permission.");
+      setDeleting(false);
       return;
     }
     router.push(backUrl);
@@ -487,8 +490,16 @@ export default function ItemActions({ item, images, itemId, backUrl }: Props) {
                   </button>
                 )}
                 {isOwner && (
-                  <button onClick={deleteItem} className="btn-danger">
-                    Delete item
+                  <button
+                    onClick={deleteItem}
+                    disabled={deleting}
+                    className="btn-danger"
+                    style={{
+                      opacity: deleting ? 0.7 : 1,
+                      cursor: deleting ? "wait" : "pointer",
+                    }}
+                  >
+                    {deleting ? "Deleting…" : "Delete item"}
                   </button>
                 )}
               </>
