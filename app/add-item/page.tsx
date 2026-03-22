@@ -6,9 +6,30 @@ import { supabase } from "../lib/supabaseClient";
 
 type Category = { id: string; name: string };
 
-// Categories are the same for every user — cache them in module scope
-// so revisiting the page is instant (no re-fetch ever).
+// ── Category prefetch ────────────────────────────────────────────────────────
+// categoriesCache holds the result once fetched — subsequent visits to this
+// page (within the same browser session) resolve instantly from memory.
 let categoriesCache: Category[] | null = null;
+
+// categoriesPrefetch fires at module-load time — the moment the JS bundle
+// is parsed, before React mounts, before auth, before the user has even
+// finished looking at the page. By the time useEffect runs and getSession()
+// resolves, this fetch is already done or nearly done.
+// The typeof window guard prevents this from running during Next.js SSR
+// where window/fetch are unavailable.
+const categoriesPrefetch: Promise<Category[]> =
+  typeof window !== "undefined"
+    ? import("../lib/supabaseClient").then(({ supabase }) =>
+        supabase
+          .from("categories")
+          .select("id, name")
+          .order("name", { ascending: true })
+          .then(({ data }) => {
+            if (data) categoriesCache = data;
+            return data || [];
+          }),
+      )
+    : Promise.resolve([]);
 
 export default function AddItemPage() {
   const router = useRouter();
@@ -42,19 +63,12 @@ export default function AddItemPage() {
       }
       userIdRef.current = user.id;
 
-      // Fire categories + profile fetch in parallel
+      // Categories are already in flight from module load — just await the
+      // same promise. If the cache is already populated this resolves
+      // synchronously on the next tick. Either way, no duplicate fetch.
       const catPromise = categoriesCache
         ? Promise.resolve(categoriesCache)
-        : supabase
-            .from("categories")
-            .select("id, name")
-            .order("name", { ascending: true })
-            .then(({ data }) => {
-              if (data) {
-                categoriesCache = data;
-              }
-              return data || [];
-            });
+        : categoriesPrefetch;
 
       const profilePromise = supabase
         .from("profiles")
@@ -189,9 +203,9 @@ export default function AddItemPage() {
       return;
     }
 
-    // FIX 1: Upload all images in parallel, collect URLs, then batch-insert
+    // Upload all images in parallel, collect URLs, then batch-insert
     // in a single DB call instead of one insert per image.
-    // FIX 2: Wrap the entire upload block in a 30-second timeout so users
+    // Entire upload block wrapped in a 30-second timeout so users
     // get a clear error instead of waiting forever on a poor connection.
     if (images.length > 0) {
       try {
@@ -218,14 +232,12 @@ export default function AddItemPage() {
             // Step 2 — single batch insert for all URLs (1 DB call instead of 3)
             const validUrls = uploadedUrls.filter(Boolean) as string[];
             if (validUrls.length > 0) {
-              await supabase
-                .from("item_images")
-                .insert(
-                  validUrls.map((image_url) => ({
-                    item_id: item.id,
-                    image_url,
-                  })),
-                );
+              await supabase.from("item_images").insert(
+                validUrls.map((image_url) => ({
+                  item_id: item.id,
+                  image_url,
+                })),
+              );
             }
           })(),
           new Promise<never>((_, reject) =>
