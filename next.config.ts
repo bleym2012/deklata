@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  reactStrictMode: false,
   // ── IMAGE OPTIMISATION ────────────────────────────────────────────────────
   images: {
     // AVIF ~50% smaller than JPEG, WebP ~30% smaller.

@@ -90,7 +90,7 @@ export default function Footer() {
                   icon: <TwitterIcon />,
                 },
                 {
-                  href: "https://facebook.com/yourhandle",
+                  href: "https://facebook.com/deklata",
                   icon: <FacebookIcon />,
                 },
                 {
