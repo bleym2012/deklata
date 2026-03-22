@@ -64,10 +64,6 @@ export default function AddItemClient({ categories }: Props) {
 
   async function compressImage(file: File): Promise<File> {
     return new Promise((resolve) => {
-      // Target: 400KB max, 900px max dimension, single encode pass.
-      // 900px is plenty for a student item listing.
-      // Single pass at 0.75 quality is faster and produces smaller files
-      // than double-pass at 0.82/0.65 — critical for Ghana mobile connections.
       const MAX_SIZE = 400 * 1024; // 400KB
       const MAX_DIM = 900;
       const QUALITY = 0.75;
@@ -91,7 +87,6 @@ export default function AddItemClient({ categories }: Props) {
         canvas.width = width;
         canvas.height = height;
         canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
-        // Single encode pass — no retry loop
         canvas.toBlob(
           (blob) => {
             resolve(
@@ -137,7 +132,6 @@ export default function AddItemClient({ categories }: Props) {
     setSubmitting(true);
     setError(null);
 
-    // Insert item + upload images in one shot — no pre-flight auth calls
     const { data: item, error: itemError } = await supabase
       .from("items")
       .insert({
@@ -159,37 +153,34 @@ export default function AddItemClient({ categories }: Props) {
       return;
     }
 
-    // FIX 1: Upload all images in parallel, collect URLs, then batch-insert
-    // in a single DB call instead of one insert per image.
-    // FIX 2: Wrap the entire upload block in a 30-second timeout so users
-    // get a clear error instead of waiting forever on a poor connection.
+    // Upload images to Cloudflare R2 via server-side API route.
+    // R2 credentials never touch the browser — all signing on Vercel.
     if (images.length > 0) {
       try {
         await Promise.race([
           (async () => {
-            // Step 1 — upload all images to storage in parallel with progress
             let uploaded = 0;
             setUploadProgress(0);
+
             const uploadedUrls = await Promise.all(
               images.map(async (image) => {
-                const ext = image.name.split(".").pop()?.toLowerCase() || "jpg";
-                const filePath = `${item.id}/${crypto.randomUUID()}.${ext}`;
-                const { error: uploadError } = await supabase.storage
-                  .from("item-images")
-                  .upload(filePath, image, {
-                    contentType: image.type,
-                    upsert: false,
-                  });
-                if (uploadError) return null;
+                const formData = new FormData();
+                formData.append("file", image);
+                formData.append("itemId", item.id);
+
+                const res = await fetch("/api/upload", {
+                  method: "POST",
+                  body: formData,
+                });
+
+                if (!res.ok) return null;
+                const { url } = await res.json();
                 uploaded++;
                 setUploadProgress(Math.round((uploaded / images.length) * 100));
-                return supabase.storage
-                  .from("item-images")
-                  .getPublicUrl(filePath).data.publicUrl;
+                return url as string;
               }),
             );
 
-            // Step 2 — single batch insert for all URLs (1 DB call instead of 3)
             const validUrls = uploadedUrls.filter(Boolean) as string[];
             if (validUrls.length > 0) {
               await supabase.from("item_images").insert(
