@@ -138,7 +138,8 @@ async function sha256Hex(
   } else {
     input = new Uint8Array(data as ArrayBuffer);
   }
-  const buf = await globalThis.crypto.subtle.digest("SHA-256", input);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const buf = await globalThis.crypto.subtle.digest("SHA-256", input as any);
   return Array.from(new Uint8Array(buf))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
@@ -150,17 +151,19 @@ async function hmac(
 ): Promise<Uint8Array> {
   const rawKey =
     key instanceof Uint8Array ? key : new Uint8Array(key as ArrayBuffer);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const cryptoKey = await globalThis.crypto.subtle.importKey(
     "raw",
-    rawKey,
+    rawKey as any,
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"],
   );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sig = await globalThis.crypto.subtle.sign(
     "HMAC",
     cryptoKey,
-    new TextEncoder().encode(data),
+    new TextEncoder().encode(data) as any,
   );
   return new Uint8Array(sig);
 }
