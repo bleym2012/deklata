@@ -22,6 +22,7 @@ export default function AddItemClient({ categories }: Props) {
   const [fileInputKey, setFileInputKey] = useState(Date.now());
   const [submitting, setSubmitting] = useState(false);
   const [compressing, setCompressing] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [condition, setCondition] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -63,12 +64,19 @@ export default function AddItemClient({ categories }: Props) {
 
   async function compressImage(file: File): Promise<File> {
     return new Promise((resolve) => {
-      const MAX_SIZE = 1024 * 1024;
-      const MAX_DIM = 1400;
+      // Target: 400KB max, 900px max dimension, single encode pass.
+      // 900px is plenty for a student item listing.
+      // Single pass at 0.75 quality is faster and produces smaller files
+      // than double-pass at 0.82/0.65 — critical for Ghana mobile connections.
+      const MAX_SIZE = 400 * 1024; // 400KB
+      const MAX_DIM = 900;
+      const QUALITY = 0.75;
+
       if (file.size <= MAX_SIZE) {
         resolve(file);
         return;
       }
+
       const img = new Image();
       const url = URL.createObjectURL(file);
       img.onload = () => {
@@ -83,32 +91,17 @@ export default function AddItemClient({ categories }: Props) {
         canvas.width = width;
         canvas.height = height;
         canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+        // Single encode pass — no retry loop
         canvas.toBlob(
-          (blob1) => {
-            if (blob1 && blob1.size <= MAX_SIZE) {
-              resolve(
-                new File([blob1], file.name.replace(/\.[^.]+$/, ".jpg"), {
-                  type: "image/jpeg",
-                }),
-              );
-            } else {
-              canvas.toBlob(
-                (blob2) => {
-                  resolve(
-                    new File(
-                      [blob2 || blob1 || file],
-                      file.name.replace(/\.[^.]+$/, ".jpg"),
-                      { type: "image/jpeg" },
-                    ),
-                  );
-                },
-                "image/jpeg",
-                0.65,
-              );
-            }
+          (blob) => {
+            resolve(
+              new File([blob || file], file.name.replace(/\.[^.]+$/, ".jpg"), {
+                type: "image/jpeg",
+              }),
+            );
           },
           "image/jpeg",
-          0.82,
+          QUALITY,
         );
       };
       img.onerror = () => resolve(file);
@@ -174,7 +167,9 @@ export default function AddItemClient({ categories }: Props) {
       try {
         await Promise.race([
           (async () => {
-            // Step 1 — upload all images to storage in parallel
+            // Step 1 — upload all images to storage in parallel with progress
+            let uploaded = 0;
+            setUploadProgress(0);
             const uploadedUrls = await Promise.all(
               images.map(async (image) => {
                 const ext = image.name.split(".").pop()?.toLowerCase() || "jpg";
@@ -186,6 +181,8 @@ export default function AddItemClient({ categories }: Props) {
                     upsert: false,
                   });
                 if (uploadError) return null;
+                uploaded++;
+                setUploadProgress(Math.round((uploaded / images.length) * 100));
                 return supabase.storage
                   .from("item-images")
                   .getPublicUrl(filePath).data.publicUrl;
@@ -217,11 +214,13 @@ export default function AddItemClient({ categories }: Props) {
         ]);
       } catch (err: any) {
         setError(err.message);
+        setUploadProgress(0);
         setSubmitting(false);
         return;
       }
     }
 
+    setUploadProgress(0);
     router.push("/");
   }
 
@@ -461,7 +460,11 @@ export default function AddItemClient({ categories }: Props) {
             className="btn-primary"
             style={{ marginTop: 8, opacity: isLoading ? 0.7 : 1 }}
           >
-            {submitting ? "Posting your item…" : "Post item for free"}
+            {submitting
+              ? uploadProgress > 0
+                ? `Uploading photos… ${uploadProgress}%`
+                : "Posting your item…"
+              : "Post item for free"}
           </button>
 
           {error && (
