@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { supabase, prepareSignOut } from "../lib/supabaseClient";
 
@@ -11,45 +11,40 @@ export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
 
+  // Use a ref to track in-flight pending count fetches.
+  // If a new auth event fires before the previous fetch completes,
+  // we ignore the stale result — prevents state thrashing that
+  // blocks the JS thread and makes the hamburger unresponsive.
+  const fetchId = useRef(0);
+
+  async function syncPendingCount(uid: string) {
+    const id = ++fetchId.current;
+    const { data: reqs } = await supabase
+      .from("requests")
+      .select("id, items!inner(owner_id)", { count: "exact", head: false })
+      .eq("items.owner_id", uid)
+      .eq("status", "pending");
+    // Discard stale results if a newer fetch has started
+    if (id !== fetchId.current) return;
+    setPendingCount(reqs?.length ?? 0);
+  }
+
   useEffect(() => {
-    // After mount, sync real auth state and pending count.
-    // data-auth on <html> is already correct from the inline script,
-    // so this runs silently in the background — no visible change for
-    // the user, just keeps state accurate for the session.
-    supabase.auth.getSession().then(async ({ data }) => {
+    supabase.auth.getSession().then(({ data }) => {
       const u = data.session?.user ?? null;
-      const isLoggedIn = !!u;
-      document.documentElement.setAttribute(
-        "data-auth",
-        isLoggedIn ? "user" : "guest",
-      );
-      if (u) {
-        const { data: reqs } = await supabase
-          .from("requests")
-          .select("id, items!inner(owner_id)", { count: "exact", head: false })
-          .eq("items.owner_id", u.id)
-          .eq("status", "pending");
-        setPendingCount(reqs?.length ?? 0);
-      }
+      document.documentElement.setAttribute("data-auth", u ? "user" : "guest");
+      if (u) syncPendingCount(u.id);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      (_event, session) => {
         const u = session?.user ?? null;
         document.documentElement.setAttribute(
           "data-auth",
           u ? "user" : "guest",
         );
         if (u) {
-          const { data: reqs } = await supabase
-            .from("requests")
-            .select("id, items!inner(owner_id)", {
-              count: "exact",
-              head: false,
-            })
-            .eq("items.owner_id", u.id)
-            .eq("status", "pending");
-          setPendingCount(reqs?.length ?? 0);
+          syncPendingCount(u.id);
         } else {
           setPendingCount(0);
         }
@@ -69,153 +64,6 @@ export default function Header() {
     await supabase.auth.signOut();
     router.push("/");
   }
-
-  // Nav links are always fully rendered in the HTML — server and client
-  // output identical structure. Visibility is controlled entirely by the
-  // CSS classes .nav-user / .nav-guest driven by html[data-auth] attribute.
-  // The inline script in layout.tsx sets data-auth before body renders,
-  // so the correct links are visible from the very first painted frame.
-  const SharedLinks = ({ mobile }: { mobile: boolean }) => (
-    <>
-      <Link href="/how-it-works" style={mobile ? mobileLink : desktopLink}>
-        How it works
-      </Link>
-    </>
-  );
-
-  const UserLinks = ({ mobile }: { mobile: boolean }) => (
-    <span className="nav-user">
-      <Link href="/add-item" style={mobile ? mobileLink : desktopLink}>
-        {mobile ? (
-          "Add item"
-        ) : (
-          <span
-            style={{
-              background: "var(--gold)",
-              color: "var(--white)",
-              padding: "7px 16px",
-              borderRadius: 999,
-              fontFamily: "var(--font-display)",
-              fontWeight: 700,
-              fontSize: 13,
-              letterSpacing: "0.2px",
-            }}
-          >
-            + Add item
-          </span>
-        )}
-      </Link>
-      <Link
-        href="/dashboard"
-        style={mobile ? mobileLink : { ...desktopLink, position: "relative" }}
-      >
-        Dashboard
-        {pendingCount > 0 && !mobile && (
-          <span
-            style={{
-              position: "absolute",
-              top: -4,
-              right: -4,
-              background: "var(--gold)",
-              color: "#fff",
-              fontSize: 9,
-              fontWeight: 800,
-              width: 16,
-              height: 16,
-              borderRadius: "50%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontFamily: "var(--font-display)",
-            }}
-          >
-            {pendingCount > 9 ? "9+" : pendingCount}
-          </span>
-        )}
-        {pendingCount > 0 && mobile && (
-          <span
-            style={{
-              marginLeft: 8,
-              background: "var(--gold)",
-              color: "#fff",
-              fontSize: 10,
-              fontWeight: 800,
-              padding: "1px 7px",
-              borderRadius: 999,
-              fontFamily: "var(--font-display)",
-            }}
-          >
-            {pendingCount}
-          </span>
-        )}
-      </Link>
-      <Link href="/my-requests" style={mobile ? mobileLink : desktopLink}>
-        My requests
-      </Link>
-      <Link href="/profile" style={mobile ? mobileLink : desktopLink}>
-        Profile
-      </Link>
-    </span>
-  );
-
-  const GuestLinks = ({ mobile }: { mobile: boolean }) => (
-    <span className="nav-guest">
-      <Link href="/login" style={mobile ? mobileLink : desktopLink}>
-        Log in
-      </Link>
-      <Link
-        href="/register"
-        style={{
-          ...(mobile ? mobileLink : desktopLink),
-          ...(mobile
-            ? {}
-            : {
-                background: "var(--green-800)",
-                color: "var(--white)",
-                padding: "7px 18px",
-                borderRadius: 999,
-                fontFamily: "var(--font-display)",
-                fontWeight: 700,
-                fontSize: 13,
-              }),
-        }}
-      >
-        Sign up
-      </Link>
-    </span>
-  );
-
-  const LogoutBtn = ({ mobile }: { mobile: boolean }) => (
-    <span className="nav-user">
-      <button
-        onClick={handleLogout}
-        style={{
-          background: "none",
-          border: "none",
-          color: "#dc2626",
-          fontFamily: "var(--font-body)",
-          fontWeight: 600,
-          fontSize: mobile ? 15 : 13,
-          cursor: "pointer",
-          padding: mobile ? "4px 0" : 0,
-        }}
-      >
-        Logout
-      </button>
-    </span>
-  );
-
-  const NavLinks = ({ mobile = false }: { mobile?: boolean }) => (
-    <>
-      <SharedLinks mobile={mobile} />
-      <UserLinks mobile={mobile} />
-      <Link href="/contact" style={mobile ? mobileLink : desktopLink}>
-        Contact
-      </Link>
-      <GuestLinks mobile={mobile} />
-      <LogoutBtn mobile={mobile} />
-    </>
-  );
 
   return (
     <header
@@ -240,7 +88,7 @@ export default function Header() {
           justifyContent: "space-between",
         }}
       >
-        {/* LOGO — no auth dependency, always identical */}
+        {/* LOGO */}
         <Link
           href="/"
           style={{
@@ -268,9 +116,14 @@ export default function Header() {
           className="header-desktop-nav"
           style={{ display: "flex", gap: 4, alignItems: "center" }}
         >
-          <NavLinks />
+          <NavLinks
+            mobile={false}
+            pendingCount={pendingCount}
+            onLogout={handleLogout}
+          />
         </nav>
 
+        {/* HAMBURGER */}
         <button
           onClick={() => setMenuOpen((o) => !o)}
           aria-label="Toggle menu"
@@ -342,10 +195,158 @@ export default function Header() {
             animation: "header-slideDown 0.18s ease",
           }}
         >
-          <NavLinks mobile />
+          <NavLinks
+            mobile={true}
+            pendingCount={pendingCount}
+            onLogout={handleLogout}
+          />
         </div>
       )}
     </header>
+  );
+}
+
+/* ── Nav links extracted OUTSIDE Header so React never recreates
+   them as new component types on re-render — eliminates unnecessary
+   unmount/remount cycles that blocked the JS thread on mobile. ── */
+
+interface NavProps {
+  mobile: boolean;
+  pendingCount: number;
+  onLogout: () => void;
+}
+
+function NavLinks({ mobile, pendingCount, onLogout }: NavProps) {
+  return (
+    <>
+      {/* Shared */}
+      <Link href="/how-it-works" style={mobile ? mobileLink : desktopLink}>
+        How it works
+      </Link>
+
+      {/* User only */}
+      <span className="nav-user">
+        <Link href="/add-item" style={mobile ? mobileLink : desktopLink}>
+          {mobile ? (
+            "Add item"
+          ) : (
+            <span
+              style={{
+                background: "var(--gold)",
+                color: "var(--white)",
+                padding: "7px 16px",
+                borderRadius: 999,
+                fontFamily: "var(--font-display)",
+                fontWeight: 700,
+                fontSize: 13,
+                letterSpacing: "0.2px",
+              }}
+            >
+              + Add item
+            </span>
+          )}
+        </Link>
+        <Link
+          href="/dashboard"
+          style={mobile ? mobileLink : { ...desktopLink, position: "relative" }}
+        >
+          Dashboard
+          {pendingCount > 0 && !mobile && (
+            <span
+              style={{
+                position: "absolute",
+                top: -4,
+                right: -4,
+                background: "var(--gold)",
+                color: "#fff",
+                fontSize: 9,
+                fontWeight: 800,
+                width: 16,
+                height: 16,
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontFamily: "var(--font-display)",
+              }}
+            >
+              {pendingCount > 9 ? "9+" : pendingCount}
+            </span>
+          )}
+          {pendingCount > 0 && mobile && (
+            <span
+              style={{
+                marginLeft: 8,
+                background: "var(--gold)",
+                color: "#fff",
+                fontSize: 10,
+                fontWeight: 800,
+                padding: "1px 7px",
+                borderRadius: 999,
+                fontFamily: "var(--font-display)",
+              }}
+            >
+              {pendingCount}
+            </span>
+          )}
+        </Link>
+        <Link href="/my-requests" style={mobile ? mobileLink : desktopLink}>
+          My requests
+        </Link>
+        <Link href="/profile" style={mobile ? mobileLink : desktopLink}>
+          Profile
+        </Link>
+      </span>
+
+      <Link href="/contact" style={mobile ? mobileLink : desktopLink}>
+        Contact
+      </Link>
+
+      {/* Guest only */}
+      <span className="nav-guest">
+        <Link href="/login" style={mobile ? mobileLink : desktopLink}>
+          Log in
+        </Link>
+        <Link
+          href="/register"
+          style={{
+            ...(mobile ? mobileLink : desktopLink),
+            ...(mobile
+              ? {}
+              : {
+                  background: "var(--green-800)",
+                  color: "var(--white)",
+                  padding: "7px 18px",
+                  borderRadius: 999,
+                  fontFamily: "var(--font-display)",
+                  fontWeight: 700,
+                  fontSize: 13,
+                }),
+          }}
+        >
+          Sign up
+        </Link>
+      </span>
+
+      {/* Logout */}
+      <span className="nav-user">
+        <button
+          onClick={onLogout}
+          style={{
+            background: "none",
+            border: "none",
+            color: "#dc2626",
+            fontFamily: "var(--font-body)",
+            fontWeight: 600,
+            fontSize: mobile ? 15 : 13,
+            cursor: "pointer",
+            padding: mobile ? "4px 0" : 0,
+          }}
+        >
+          Logout
+        </button>
+      </span>
+    </>
   );
 }
 
