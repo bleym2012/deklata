@@ -6,30 +6,9 @@ import { supabase } from "../lib/supabaseClient";
 
 type Category = { id: string; name: string };
 
-// ── Category prefetch ────────────────────────────────────────────────────────
-// categoriesCache holds the result once fetched — subsequent visits to this
-// page (within the same browser session) resolve instantly from memory.
+// Categories are the same for every user — cache them in module scope
+// so revisiting the page is instant (no re-fetch ever).
 let categoriesCache: Category[] | null = null;
-
-// categoriesPrefetch fires at module-load time — the moment the JS bundle
-// is parsed, before React mounts, before auth, before the user has even
-// finished looking at the page. By the time useEffect runs and getSession()
-// resolves, this fetch is already done or nearly done.
-// The typeof window guard prevents this from running during Next.js SSR
-// where window/fetch are unavailable.
-const categoriesPrefetch: Promise<Category[]> =
-  typeof window !== "undefined"
-    ? import("../lib/supabaseClient").then(({ supabase }) =>
-        supabase
-          .from("categories")
-          .select("id, name")
-          .order("name", { ascending: true })
-          .then(({ data }) => {
-            if (data) categoriesCache = data;
-            return data || [];
-          }),
-      )
-    : Promise.resolve([]);
 
 export default function AddItemPage() {
   const router = useRouter();
@@ -55,6 +34,22 @@ export default function AddItemPage() {
   const readyRef = useRef(false);
 
   useEffect(() => {
+    // Load categories immediately — independently from auth.
+    // This means the dropdown is ready before auth even completes.
+    if (!categoriesCache) {
+      supabase
+        .from("categories")
+        .select("id, name")
+        .order("name", { ascending: true })
+        .then(({ data }) => {
+          if (data && data.length > 0) {
+            categoriesCache = data;
+            setCategories(data);
+          }
+        });
+    }
+
+    // Auth + profile check runs in parallel with categories fetch
     supabase.auth.getSession().then(({ data }) => {
       const user = data.session?.user;
       if (!user) {
@@ -63,38 +58,24 @@ export default function AddItemPage() {
       }
       userIdRef.current = user.id;
 
-      // Categories are already in flight from module load — just await the
-      // same promise. If the cache is already populated this resolves
-      // synchronously on the next tick. Either way, no duplicate fetch.
-      const catPromise = categoriesCache
-        ? Promise.resolve(categoriesCache)
-        : categoriesPrefetch;
-
-      const profilePromise = supabase
+      supabase
         .from("profiles")
         .select("campus, phone")
         .eq("id", user.id)
         .single()
-        .then(
-          ({ data }) =>
-            data as { campus: string | null; phone: string | null } | null,
-        );
-
-      Promise.all([catPromise, profilePromise]).then(([cats, profile]) => {
-        const noCampus =
-          !profile?.campus ||
-          profile.campus === "Not specified" ||
-          profile.campus.trim() === "";
-        const noPhone = !profile?.phone || profile.phone.trim() === "";
-        if (noCampus || noPhone) {
-          router.push("/onboarding");
-          return;
-        }
-
-        campusRef.current = profile?.campus ?? null;
-        readyRef.current = true;
-        if (cats.length > 0) setCategories(cats);
-      });
+        .then(({ data: profile }) => {
+          const noCampus =
+            !profile?.campus ||
+            profile.campus === "Not specified" ||
+            profile.campus.trim() === "";
+          const noPhone = !profile?.phone || profile.phone.trim() === "";
+          if (noCampus || noPhone) {
+            router.push("/onboarding");
+            return;
+          }
+          campusRef.current = profile?.campus ?? null;
+          readyRef.current = true;
+        });
     });
   }, []);
 
@@ -203,9 +184,9 @@ export default function AddItemPage() {
       return;
     }
 
-    // Upload all images in parallel, collect URLs, then batch-insert
+    // FIX 1: Upload all images in parallel, collect URLs, then batch-insert
     // in a single DB call instead of one insert per image.
-    // Entire upload block wrapped in a 30-second timeout so users
+    // FIX 2: Wrap the entire upload block in a 30-second timeout so users
     // get a clear error instead of waiting forever on a poor connection.
     if (images.length > 0) {
       try {
