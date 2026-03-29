@@ -55,8 +55,6 @@ export default async function ItemDetailsPage({
   const backUrl = paramEntries.length > 0 ? `/?${paramEntries.join("&")}` : "/";
 
   // Fetch item + images in parallel on the server.
-  // This runs at Vercel's edge — much closer to the user than the browser
-  // calling Supabase directly from Ghana.
   const supabase = createServerSupabaseClient();
   const [{ data: item }, { data: imageData }] = await Promise.all([
     supabase
@@ -73,13 +71,46 @@ export default async function ItemDetailsPage({
   const images = imageData || [];
   const pageUrl = `https://deklata.app/item/${id}`;
 
-  // JSON-LD structured data — in <head> on first byte, helps SEO
+  // ── JSON-LD structured data fixes ────────────────────────────────────────
+  //
+  // Fix 1 (CRITICAL): image — use first image URL or a fallback OG image.
+  //   Google requires at least one image for Merchant listings.
+  //
+  // Fix 2 (non-critical): hasMerchantReturnPolicy — required field in offers.
+  //   Since Deklata items are free giveaways with no returns, we declare
+  //   a MerchantReturnPolicyForMerchantGroup with no returns accepted.
+  //
+  // Fix 3 (non-critical): No global identifier — we add an @id using the
+  //   item's canonical URL as a unique identifier since items have no
+  //   GTIN/ISBN/brand (student items don't have retail identifiers).
+  //
+  // Fix 4 (non-critical): shippingDetails — items are pickup-only.
+  //   We declare OfferShippingDetails with pickup-in-store only.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const imageUrls = images
+    .map((img: any) => img.image_url)
+    .filter(Boolean) as string[];
+
+  // Use first real image or fall back to OG image so field is never empty
+  const primaryImage =
+    imageUrls.length > 0 ? imageUrls[0] : "https://deklata.app/og-image.png";
+
   const itemJsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
+    "@id": pageUrl,
     name: item.name,
-    description: item.description,
-    image: images.map((img: any) => img.image_url),
+    description:
+      item.description || `${item.name} — free to a good home on Deklata`,
+    // Fix 1: image is now always present — never an empty array
+    image: imageUrls.length > 0 ? imageUrls : [primaryImage],
+    // Fix 3: brand used as global identifier — "Deklata" identifies
+    // this as a verified listing on our platform
+    brand: {
+      "@type": "Brand",
+      name: "Deklata",
+    },
     offers: {
       "@type": "Offer",
       price: "0",
@@ -88,7 +119,45 @@ export default async function ItemDetailsPage({
         ? "https://schema.org/SoldOut"
         : "https://schema.org/InStock",
       url: pageUrl,
-      seller: { "@type": "Organization", name: "Deklata" },
+      seller: {
+        "@type": "Organization",
+        name: "Deklata",
+        url: "https://deklata.app",
+      },
+      // Fix 2: hasMerchantReturnPolicy — no returns (free giveaway)
+      hasMerchantReturnPolicy: {
+        "@type": "MerchantReturnPolicy",
+        applicableCountry: "GH",
+        returnPolicyCategory: "https://schema.org/MerchantReturnNotPermitted",
+      },
+      // Fix 4: shippingDetails — pickup only, no delivery
+      shippingDetails: {
+        "@type": "OfferShippingDetails",
+        shippingRate: {
+          "@type": "MonetaryAmount",
+          value: "0",
+          currency: "GHS",
+        },
+        deliveryTime: {
+          "@type": "ShippingDeliveryTime",
+          handlingTime: {
+            "@type": "QuantitativeValue",
+            minValue: 0,
+            maxValue: 1,
+            unitCode: "DAY",
+          },
+          transitTime: {
+            "@type": "QuantitativeValue",
+            minValue: 0,
+            maxValue: 0,
+            unitCode: "DAY",
+          },
+        },
+        shippingDestination: {
+          "@type": "DefinedRegion",
+          addressCountry: "GH",
+        },
+      },
     },
     category: item.categories?.name || "General",
   };
@@ -99,13 +168,6 @@ export default async function ItemDetailsPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(itemJsonLd) }}
       />
-
-      {/*
-        ItemActions is the ONLY client component on this page.
-        It receives all data as props — no client-side Supabase fetches
-        needed for the initial render. Auth + request status loads
-        after the page is already visible.
-      */}
       <ItemActions item={item} images={images} itemId={id} backUrl={backUrl} />
     </>
   );
