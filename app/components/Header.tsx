@@ -58,7 +58,6 @@ export default function Header() {
     prepareSignOut();
     await supabase.auth.signOut();
     router.push("/");
-    router.refresh();
   }
 
   return (
