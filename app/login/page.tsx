@@ -25,7 +25,19 @@ export default function LoginPage() {
     });
   }, [router]);
 
-  if (initializing) return null;
+  if (initializing)
+    return (
+      <main
+        style={{
+          minHeight: "calc(100vh - 64px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 20,
+          background: "var(--cream)",
+        }}
+      />
+    );
 
   const signInWithGoogle = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
