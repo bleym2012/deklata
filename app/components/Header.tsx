@@ -11,20 +11,15 @@ export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
 
-  // Use a ref to track in-flight pending count fetches.
-  // If a new auth event fires before the previous fetch completes,
-  // we ignore the stale result — prevents state thrashing that
-  // blocks the JS thread and makes the hamburger unresponsive.
   const fetchId = useRef(0);
 
-  async function syncPendingCount(uid: string) {
+  async function syncPendingCount(uid) {
     const id = ++fetchId.current;
     const { data: reqs } = await supabase
       .from("requests")
       .select("id, items!inner(owner_id)", { count: "exact", head: false })
       .eq("items.owner_id", uid)
       .eq("status", "pending");
-    // Discard stale results if a newer fetch has started
     if (id !== fetchId.current) return;
     setPendingCount(reqs?.length ?? 0);
   }
@@ -63,6 +58,7 @@ export default function Header() {
     prepareSignOut();
     await supabase.auth.signOut();
     router.push("/");
+    router.refresh();
   }
 
   return (
@@ -206,17 +202,7 @@ export default function Header() {
   );
 }
 
-/* ── Nav links extracted OUTSIDE Header so React never recreates
-   them as new component types on re-render — eliminates unnecessary
-   unmount/remount cycles that blocked the JS thread on mobile. ── */
-
-interface NavProps {
-  mobile: boolean;
-  pendingCount: number;
-  onLogout: () => void;
-}
-
-function NavLinks({ mobile, pendingCount, onLogout }: NavProps) {
+function NavLinks({ mobile, pendingCount, onLogout }) {
   return (
     <>
       {/* Shared */}
@@ -350,7 +336,7 @@ function NavLinks({ mobile, pendingCount, onLogout }: NavProps) {
   );
 }
 
-const desktopLink: React.CSSProperties = {
+const desktopLink = {
   color: "var(--ink-700)",
   fontFamily: "var(--font-body)",
   fontSize: 13,
@@ -361,7 +347,7 @@ const desktopLink: React.CSSProperties = {
   textDecoration: "none",
 };
 
-const mobileLink: React.CSSProperties = {
+const mobileLink = {
   color: "var(--ink-700)",
   fontFamily: "var(--font-body)",
   fontSize: 15,
