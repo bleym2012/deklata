@@ -5,6 +5,7 @@
 // CLIENT COMPONENT — handles all interactive elements:
 // - Back button navigation
 // - Image carousel scroll + dot indicators
+// - Full-screen image lightbox (tap an image to view it large, swipe between)
 // - Auth state (is user logged in? have they requested this item?)
 // - Request button + request flow
 // - Delete button (owner only)
@@ -15,7 +16,7 @@
 // already rendered by the server component — this component only adds
 // interactivity on top of what's already visible.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -43,6 +44,54 @@ export default function ItemActions({ item, images, itemId, backUrl }: Props) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [requestSuccess, setRequestSuccess] = useState(false);
+
+  // ── Lightbox state ──────────────────────────────────────────────────────
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const lightboxRef = useRef<HTMLDivElement>(null);
+
+  function openLightbox(idx: number) {
+    setLightboxIndex(idx);
+    setLightboxOpen(true);
+  }
+
+  function goToLightboxIndex(i: number) {
+    const clamped = Math.max(0, Math.min(i, images.length - 1));
+    setLightboxIndex(clamped);
+    const el = lightboxRef.current;
+    if (el) el.scrollTo({ left: clamped * el.clientWidth, behavior: "smooth" });
+  }
+
+  // When the lightbox opens, jump the scroll container to the tapped image
+  // (instant, no animation) so it appears already on the right photo.
+  useEffect(() => {
+    if (lightboxOpen && lightboxRef.current) {
+      lightboxRef.current.scrollLeft =
+        lightboxIndex * lightboxRef.current.clientWidth;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lightboxOpen]);
+
+  // Keyboard nav + body scroll lock while the lightbox is open
+  useEffect(() => {
+    if (!lightboxOpen) return;
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLightboxOpen(false);
+      else if (e.key === "ArrowRight") goToLightboxIndex(lightboxIndex + 1);
+      else if (e.key === "ArrowLeft") goToLightboxIndex(lightboxIndex - 1);
+    };
+
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lightboxOpen, lightboxIndex, images.length]);
 
   // Update document title — item data is already available from props
   useEffect(() => {
@@ -236,6 +285,7 @@ export default function ItemActions({ item, images, itemId, backUrl }: Props) {
               images.map((img, idx) => (
                 <div
                   key={img.id}
+                  onClick={() => openLightbox(idx)}
                   style={{
                     position: "relative",
                     flexShrink: 0,
@@ -246,6 +296,7 @@ export default function ItemActions({ item, images, itemId, backUrl }: Props) {
                     scrollSnapAlign: "start",
                     background: "var(--green-50)",
                     overflow: "hidden",
+                    cursor: "zoom-in",
                   }}
                 >
                   <Image
@@ -257,6 +308,27 @@ export default function ItemActions({ item, images, itemId, backUrl }: Props) {
                     quality={80}
                     priority={idx === 0}
                   />
+                  {/* Subtle hint that the image is tappable */}
+                  <span
+                    style={{
+                      position: "absolute",
+                      bottom: 10,
+                      right: 10,
+                      background: "rgba(0,0,0,0.55)",
+                      color: "#fff",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      padding: "4px 9px",
+                      borderRadius: 999,
+                      fontFamily: "var(--font-body)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                      pointerEvents: "none",
+                    }}
+                  >
+                    🔍 Tap to view
+                  </span>
                 </div>
               ))
             ) : (
@@ -578,11 +650,197 @@ export default function ItemActions({ item, images, itemId, backUrl }: Props) {
         </div>
       </div>
 
+      {/* ── FULL-SCREEN LIGHTBOX ────────────────────────────────────────────
+          Opens when an image is tapped. Shows the full image (objectFit:
+          contain, never cropped), swipeable on mobile via the same
+          scroll-snap pattern as the carousel, with arrows + keyboard on
+          desktop. Tap the backdrop or the X to close. */}
+      {lightboxOpen && images.length > 0 && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${item.name} images`}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1000,
+            background: "rgba(0,0,0,0.92)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            animation: "fadeIn 0.2s ease",
+          }}
+        >
+          {/* Close button */}
+          <button
+            onClick={() => setLightboxOpen(false)}
+            aria-label="Close"
+            style={{
+              position: "absolute",
+              top: 16,
+              right: 16,
+              zIndex: 1002,
+              width: 44,
+              height: 44,
+              borderRadius: 999,
+              background: "rgba(255,255,255,0.14)",
+              border: "none",
+              color: "#fff",
+              fontSize: 22,
+              lineHeight: 1,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            ✕
+          </button>
+
+          {/* Counter */}
+          {images.length > 1 && (
+            <div
+              style={{
+                position: "absolute",
+                top: 22,
+                left: 0,
+                right: 0,
+                textAlign: "center",
+                color: "#fff",
+                fontSize: 14,
+                fontWeight: 600,
+                fontFamily: "var(--font-body)",
+                zIndex: 1001,
+                pointerEvents: "none",
+              }}
+            >
+              {lightboxIndex + 1} / {images.length}
+            </div>
+          )}
+
+          {/* Swipeable image track */}
+          <div
+            ref={lightboxRef}
+            onScroll={(e) => {
+              const w = e.currentTarget.clientWidth;
+              if (w > 0)
+                setLightboxIndex(Math.round(e.currentTarget.scrollLeft / w));
+            }}
+            style={{
+              display: "flex",
+              width: "100%",
+              height: "100%",
+              overflowX: "auto",
+              overflowY: "hidden",
+              scrollSnapType: "x mandatory",
+              WebkitOverflowScrolling: "touch",
+            }}
+          >
+            {images.map((img, idx) => (
+              <div
+                key={img.id}
+                // Tapping the empty area (not the image) closes the lightbox
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) setLightboxOpen(false);
+                }}
+                style={{
+                  position: "relative",
+                  flexShrink: 0,
+                  width: "100%",
+                  height: "100%",
+                  scrollSnapAlign: "start",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Image
+                  src={img.image_url}
+                  alt={`${item.name} – photo ${idx + 1}`}
+                  fill
+                  sizes="100vw"
+                  style={{ objectFit: "contain" }}
+                  quality={90}
+                  priority={idx === lightboxIndex}
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop arrows */}
+          {images.length > 1 && (
+            <>
+              <button
+                onClick={() => goToLightboxIndex(lightboxIndex - 1)}
+                aria-label="Previous image"
+                disabled={lightboxIndex === 0}
+                style={{
+                  position: "absolute",
+                  left: 16,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  width: 48,
+                  height: 48,
+                  borderRadius: 999,
+                  background: "rgba(255,255,255,0.14)",
+                  border: "none",
+                  color: "#fff",
+                  fontSize: 24,
+                  cursor: lightboxIndex === 0 ? "default" : "pointer",
+                  opacity: lightboxIndex === 0 ? 0.35 : 1,
+                  zIndex: 1001,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                className="lightbox-arrow"
+              >
+                ‹
+              </button>
+              <button
+                onClick={() => goToLightboxIndex(lightboxIndex + 1)}
+                aria-label="Next image"
+                disabled={lightboxIndex === images.length - 1}
+                style={{
+                  position: "absolute",
+                  right: 16,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  width: 48,
+                  height: 48,
+                  borderRadius: 999,
+                  background: "rgba(255,255,255,0.14)",
+                  border: "none",
+                  color: "#fff",
+                  fontSize: 24,
+                  cursor:
+                    lightboxIndex === images.length - 1 ? "default" : "pointer",
+                  opacity: lightboxIndex === images.length - 1 ? 0.35 : 1,
+                  zIndex: 1001,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                className="lightbox-arrow"
+              >
+                ›
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       <style jsx>{`
         @media (min-width: 1024px) {
           .detail-grid {
             grid-template-columns: 1.3fr 1fr !important;
             align-items: start;
+          }
+        }
+        /* Hide the lightbox arrows on touch devices where swipe is natural */
+        @media (hover: none) and (pointer: coarse) {
+          .lightbox-arrow {
+            display: none !important;
           }
         }
       `}</style>
