@@ -62,7 +62,7 @@ export default function ItemGrid({
                   // priority on first 4 items (above fold on mobile) — fixes LCP
                   priority={index < 4}
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                  style={{ objectFit: "contain", padding: "8px" }}
+                  style={{ objectFit: "cover" }}
                 />
               ) : (
                 <div
