@@ -394,7 +394,7 @@ const TIERS = [
 
 // Highest tier whose threshold the user has reached.
 function getCurrentTier(pts: number) {
-  let current = TIERS[0];
+  let current: (typeof TIERS)[number] = TIERS[0];
   for (const tier of TIERS) {
     if (pts >= tier.min) current = tier;
   }
