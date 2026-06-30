@@ -71,13 +71,6 @@ export default function ProfilePage() {
     setLoading(false);
   }
 
-  function getTier(pts: number) {
-    if (pts >= 500) return "Gold Giver 🥇";
-    if (pts >= 250) return "Silver Giver 🥈";
-    if (pts >= 50) return "Bronze Giver 🥉";
-    return "New Giver 🌱";
-  }
-
   async function logout() {
     setLoggingOut(true);
     prepareSignOut();
@@ -134,6 +127,9 @@ export default function ProfilePage() {
       </main>
     );
   }
+
+  const currentTier = getCurrentTier(points);
+  const nextTier = getNextTier(points);
 
   return (
     <main
@@ -246,77 +242,73 @@ export default function ProfilePage() {
             marginBottom: 4,
           }}
         >
-          {getTier(points)}
+          {currentTier.label}
         </p>
 
-        {(() => {
-          const tiers = [
-            { label: "Bronze Giver 🥉", min: 0, max: 50 },
-            { label: "Silver Giver 🥈", min: 50, max: 250 },
-            { label: "Gold Giver 🥇", min: 250, max: 500 },
-          ];
-          const current =
-            tiers.find((t) => points >= t.min && points < t.max) || tiers[2];
-          const next = tiers.find((t) => t.min > (current?.min ?? 0));
-          if (!next)
-            return (
-              <p
-                style={{
-                  fontSize: 13,
-                  color: "var(--green-700)",
-                  fontWeight: 600,
-                  marginBottom: 20,
-                }}
-              >
-                🏆 Maximum tier reached!
-              </p>
+        {/* Progress to next tier — single source of truth (TIERS) drives
+            both the label above and this bar, so they can never diverge. */}
+        {!nextTier ? (
+          <p
+            style={{
+              fontSize: 13,
+              color: "var(--green-700)",
+              fontWeight: 600,
+              marginBottom: 20,
+            }}
+          >
+            🏆 Maximum tier reached!
+          </p>
+        ) : (
+          (() => {
+            const span = nextTier.min - currentTier.min;
+            const pct = Math.min(
+              100,
+              Math.max(
+                0,
+                Math.round(((points - currentTier.min) / span) * 100),
+              ),
             );
-          const pct = Math.min(
-            100,
-            Math.round(
-              ((points - current.min) / (next.min - current.min)) * 100,
-            ),
-          );
-          return (
-            <div style={{ marginBottom: 20, marginTop: 10 }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  fontSize: 11,
-                  color: "var(--ink-500)",
-                  marginBottom: 6,
-                  fontFamily: "var(--font-body)",
-                  gap: 8,
-                  flexWrap: "wrap",
-                }}
-              >
-                <span>{current.label}</span>
-                <span>
-                  {next.min - points} pts to {next.label}
-                </span>
-              </div>
-              <div
-                style={{
-                  height: 8,
-                  background: "var(--ink-100)",
-                  borderRadius: 999,
-                  overflow: "hidden",
-                }}
-              >
+            return (
+              <div style={{ marginBottom: 20, marginTop: 10 }}>
                 <div
                   style={{
-                    height: "100%",
-                    width: `${pct}%`,
-                    background: "var(--green-700)",
-                    borderRadius: 999,
-                    transition: "width 0.6s ease",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontSize: 11,
+                    color: "var(--ink-500)",
+                    marginBottom: 6,
+                    fontFamily: "var(--font-body)",
+                    gap: 8,
+                    flexWrap: "wrap",
                   }}
-                />
+                >
+                  <span>{currentTier.label}</span>
+                  <span>
+                    {nextTier.min - points} pts to {nextTier.label}
+                  </span>
+                </div>
+                <div
+                  style={{
+                    height: 8,
+                    background: "var(--ink-100)",
+                    borderRadius: 999,
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      height: "100%",
+                      width: `${pct}%`,
+                      background: "var(--green-700)",
+                      borderRadius: 999,
+                      transition: "width 0.6s ease",
+                    }}
+                  />
+                </div>
               </div>
-            </div>
-          );
-        })()}
+            );
+          })()
+        )}
 
         <p
           style={{
@@ -384,6 +376,34 @@ export default function ProfilePage() {
       </div>
     </main>
   );
+}
+
+// ── SINGLE SOURCE OF TRUTH FOR TIERS ───────────────────────────────────────
+// One ordered list (lowest → highest) drives both the tier label and the
+// progress bar. Previously these were two separate definitions that disagreed
+// (a 300-pt user showed "Silver" but the bar treated them as Gold). Deriving
+// everything from this one array makes that class of bug impossible.
+//
+// To change thresholds, edit ONLY this array.
+const TIERS = [
+  { label: "New Giver 🌱", min: 0 },
+  { label: "Bronze Giver 🥉", min: 50 },
+  { label: "Silver Giver 🥈", min: 250 },
+  { label: "Gold Giver 🥇", min: 500 },
+] as const;
+
+// Highest tier whose threshold the user has reached.
+function getCurrentTier(pts: number) {
+  let current = TIERS[0];
+  for (const tier of TIERS) {
+    if (pts >= tier.min) current = tier;
+  }
+  return current;
+}
+
+// The next tier above the user's current points, or null if at the top.
+function getNextTier(pts: number) {
+  return TIERS.find((t) => t.min > pts) ?? null;
 }
 
 const logoutBtn = {
